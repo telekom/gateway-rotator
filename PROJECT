@@ -7,4 +7,11 @@ layout:
 - go.kubebuilder.io/v4
 projectName: k8s-rotator
 repo: gw.mdw.telekom.de/rotator
+resources:
+- controller: true
+  core: true
+  group: core
+  kind: Secret
+  path: k8s.io/api/core/v1
+  version: v1
 version: "3"
