@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,9 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Calculate kid
+	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
+
 	target := &corev1.Secret{}
 	targetExists := false
 	targetNamespacedName := types.NamespacedName{
@@ -81,12 +85,13 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			},
 			Type: corev1.SecretTypeTLS,
 			Data: map[string][]byte{
-				"new-tls.crt": source.Data["tls.crt"],
-				"new-tls.key": source.Data["tls.key"],
-				"tls.crt":     {},
-				"tls.key":     {},
-				"old-tls.crt": {},
-				"old-tls.key": {},
+				"new-tls.crt":  source.Data["tls.crt"],
+				"new-tls.key":  source.Data["tls.key"],
+				"new.kid":      []byte(kid.String()),
+				"tls.crt":      {},
+				"tls.key":      {},
+				"prev-tls.crt": {},
+				"prev-tls.key": {},
 			},
 		}
 	} else {
@@ -99,14 +104,17 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			// Move tls to old-tls
 			"old-tls.crt": target.Data["tls.crt"],
 			"old-tls.key": target.Data["tls.key"],
+			"old-tls.kid": target.Data["tls.kid"],
 
 			// Move new-tls to tls
 			"tls.crt": target.Data["new-tls.crt"],
 			"tls.key": target.Data["new-tls.key"],
+			"tls.kid": target.Data["new-tls.kid"],
 
 			// Copy source secret data to new-tls
 			"new-tls.crt": source.Data["tls.crt"],
 			"new-tls.key": source.Data["tls.key"],
+			"new-tls.kid": target.Data["tls.kid"],
 		}
 
 		// Update the target secret
