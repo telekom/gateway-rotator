@@ -54,22 +54,18 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := r.Get(ctx, req.NamespacedName, source); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	val, isSourceSecret := source.Annotations[r.SourceAnnotation]
-	if !isSourceSecret || val != "true" {
-		// This is likely a target secret or some other secret we don't want to reconcile
-		log.Info("Skipping reconciliation for non-source secret")
-		return ctrl.Result{}, nil
-	}
 
 	// Calculate kid
 	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
 
+	// Get and update target
 	target := &corev1.Secret{}
-	targetExists := false
 	targetNamespacedName := types.NamespacedName{
 		Namespace: source.Namespace,
 		Name:      source.Annotations["rotator.gateway.mdw.telekom.de/destination-secret-name"],
 	}
+	log = log.WithValues("target", targetNamespacedName)
+
 	err := r.Get(ctx, targetNamespacedName, target)
 	if err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to get target secret")
@@ -77,69 +73,41 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 	if errors.IsNotFound(err) {
 		// Target doesn't exist -> initialize it
-		targetExists = false
-		target = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      targetNamespacedName.Name,
-				Namespace: source.Namespace,
-			},
-			Type: corev1.SecretTypeTLS,
-			Data: map[string][]byte{
-				"new-tls.crt":  source.Data["tls.crt"],
-				"new-tls.key":  source.Data["tls.key"],
-				"new.kid":      []byte(kid.String()),
-				"tls.crt":      {},
-				"tls.key":      {},
-				"prev-tls.crt": {},
-				"prev-tls.key": {},
-			},
+		target := initializeLocalTarget(source, kid)
+
+		if err := controllerutil.SetControllerReference(source, &target, r.Scheme); err != nil {
+			log.Error(err, "Failed to set controller reference")
+			return ctrl.Result{}, err
 		}
+
+		if err := r.Create(ctx, &target); err != nil {
+			log.Error(err, "Failed to create target secret")
+			return ctrl.Result{}, err
+		}
+		log.Info("Successfully created target secret")
 	} else {
 		// Target does exist -> rotate values
-		targetExists = true
+		// Don't rotate if source is equal to next-tls
+		if string(source.Data["tls.crt"]) == string(target.Data["next-tls.crt"]) {
+			log.Info("Skipping update, source certificate is equal to certificate in target/next-tls.crt")
+			return ctrl.Result{}, nil
+		}
+
 		log.Info("Updating target secret with rotated values")
+		updateLocalTargetData(target, source, kid)
 
-		// Create updated data map
-		updatedData := map[string][]byte{
-			// Move tls to old-tls
-			"old-tls.crt": target.Data["tls.crt"],
-			"old-tls.key": target.Data["tls.key"],
-			"old-tls.kid": target.Data["tls.kid"],
-
-			// Move new-tls to tls
-			"tls.crt": target.Data["new-tls.crt"],
-			"tls.key": target.Data["new-tls.key"],
-			"tls.kid": target.Data["new-tls.kid"],
-
-			// Copy source secret data to new-tls
-			"new-tls.crt": source.Data["tls.crt"],
-			"new-tls.key": source.Data["tls.key"],
-			"new-tls.kid": target.Data["tls.kid"],
+		if err := controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
+			log.Error(err, "Failed to set controller reference")
+			return ctrl.Result{}, err
 		}
 
 		// Update the target secret
-		target.Data = updatedData
-	}
-
-	// Set owner reference
-	if err := controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
-		log.Error(err, "Failed to set controller reference")
-		return ctrl.Result{}, err
-	}
-
-	if targetExists {
 		if err := r.Update(ctx, target); err != nil {
 			log.Error(err, "Failed to update target secret")
 			return ctrl.Result{}, err
 		}
-	} else {
-		if err := r.Create(ctx, target); err != nil {
-			log.Error(err, "Failed to create target secret")
-			return ctrl.Result{}, err
-		}
+		log.Info("Successfully updated target secret with rotated values")
 	}
-
-	log.Info("Successfully updated target secret with rotated values")
 	return ctrl.Result{}, nil
 }
 
@@ -152,7 +120,7 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		}
 
-		val, exists := secret.Annotations[r.TargetNameAnnotation]
+		val, exists := secret.Annotations[r.SourceAnnotation]
 		return exists && val == "true"
 	})
 
@@ -162,4 +130,48 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithEventFilter(secretPredicate).
 		Owns(&corev1.Secret{}).
 		Complete(r)
+}
+
+func initializeLocalTarget(source *corev1.Secret, kid uuid.UUID) corev1.Secret {
+	return corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      source.Annotations["rotator.gateway.mdw.telekom.de/destination-secret-name"],
+			Namespace: source.Namespace,
+		},
+		Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{
+			"next-tls.crt": source.Data["tls.crt"],
+			"next-tls.key": source.Data["tls.key"],
+			"next-tls.kid": []byte(kid.String()),
+			"tls.crt":      {},
+			"tls.key":      {},
+			"tls.kid":      {},
+			"prev-tls.crt": {},
+			"prev-tls.key": {},
+			"prev-tls.kid": {},
+		},
+	}
+}
+
+func updateLocalTargetData(target *corev1.Secret, source *corev1.Secret, kid uuid.UUID) {
+	// Create updated data map
+	updatedData := map[string][]byte{
+		// Move tls to prev-tls
+		"prev-tls.crt": target.Data["tls.crt"],
+		"prev-tls.key": target.Data["tls.key"],
+		"prev-tls.kid": target.Data["tls.kid"],
+
+		// Move new-tls to tls
+		"tls.crt": target.Data["next-tls.crt"],
+		"tls.key": target.Data["next-tls.key"],
+		"tls.kid": target.Data["next-tls.kid"],
+
+		// Copy source secret data to next-tls
+		"next-tls.crt": source.Data["tls.crt"],
+		"next-tls.key": source.Data["tls.key"],
+		"next-tls.kid": []byte(kid.String()),
+	}
+
+	// Update the target secret
+	target.Data = updatedData
 }
