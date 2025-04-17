@@ -5,7 +5,7 @@
 domain: rotator.gw.mdw.telekom.de
 layout:
 - go.kubebuilder.io/v4
-projectName: k8s-rotator
+projectName: k8s-tls-rotator
 repo: gw.mdw.telekom.de/rotator
 resources:
 - controller: true

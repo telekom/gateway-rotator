@@ -1,4 +1,4 @@
-# k8s-rotator
+# k8s-tls-rotator
 
 ## Motivation
 
