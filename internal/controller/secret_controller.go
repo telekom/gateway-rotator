@@ -121,6 +121,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
+// It filters the events to only those secrets with the source annotation
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	secretPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
@@ -129,8 +130,9 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		}
 
-		val, exists := secret.Annotations[r.SourceAnnotation]
-		return exists && val == "true"
+		sourceVal, sourceExists := secret.Annotations[r.SourceAnnotation]
+		targetNameVal, targetNameExists := secret.Annotations[r.TargetNameAnnotation]
+		return sourceExists && sourceVal == "true" && targetNameExists && len(targetNameVal) > 0
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
