@@ -143,6 +143,8 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// initializeLocalTarget initializes a target secret with the given source secret and kid in the next-tls.* fields.
+// It does not create the secret in the cluster.
 func initializeLocalTarget(source *corev1.Secret, kid uuid.UUID) corev1.Secret {
 	return corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -164,6 +166,11 @@ func initializeLocalTarget(source *corev1.Secret, kid uuid.UUID) corev1.Secret {
 	}
 }
 
+// updateLocalTargetData updates the target secret with the given source secret and kid by moving the
+// - values from the tls.* fields to the prev-tls.* fields
+// - the values from the next-tls.* fields to the tls.*. fields
+// - the values from the source secret to the next-tls.* fields (and generating a new kid)
+// It does not update the secret in the cluster.
 func updateLocalTargetData(target *corev1.Secret, source *corev1.Secret, kid uuid.UUID) {
 	// Create updated data map
 	updatedData := map[string][]byte{
