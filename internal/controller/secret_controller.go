@@ -58,6 +58,15 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Calculate kid
 	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
 
+	// Check if tls.crt and tls.key are set in the source secret
+	if source.Data["tls.crt"] == nil ||
+		len(source.Data["tls.crt"]) == 0 ||
+		source.Data["tls.key"] == nil ||
+		len(source.Data["tls.crt"]) == 0 {
+		log.Error(nil, "Source secret does not contain tls.crt and tls.key")
+		return ctrl.Result{}, nil
+	}
+
 	// Get and update target
 	target := &corev1.Secret{}
 	targetNamespacedName := types.NamespacedName{
