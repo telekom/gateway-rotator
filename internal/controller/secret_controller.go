@@ -38,6 +38,7 @@ type SecretReconciler struct {
 	Scheme               *runtime.Scheme
 	SourceAnnotation     string
 	TargetNameAnnotation string
+	Finalizer            string
 }
 
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -55,9 +56,6 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Calculate kid
-	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
-
 	// Check if tls.crt and tls.key are set in the source secret
 	if source.Data["tls.crt"] == nil ||
 		len(source.Data["tls.crt"]) == 0 ||
@@ -74,13 +72,56 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Name:      source.Annotations["rotator.gateway.mdw.telekom.de/destination-secret-name"],
 	}
 	log = log.WithValues("target", targetNamespacedName)
-
 	err := r.Get(ctx, targetNamespacedName, target)
-	if err != nil && !errors.IsNotFound(err) {
+	targetExists := true
+	if errors.IsNotFound(err) {
+		targetExists = false
+	} else if err != nil {
 		log.Error(err, "Failed to get target secret")
 		return ctrl.Result{}, err
 	}
-	if errors.IsNotFound(err) {
+
+	if source.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Source is not being deleted, add finalizer if not present
+		if !controllerutil.ContainsFinalizer(source, r.Finalizer) {
+			log.Info("Adding finalizer to source secret")
+			controllerutil.AddFinalizer(source, r.Finalizer)
+			if err := r.Update(ctx, source); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// Source is being deleted, prevent garbage collection of target secret
+		log.Info("Source secret is under deletion. Keeping target and removing owner reference")
+		if controllerutil.ContainsFinalizer(source, r.Finalizer) {
+			if targetExists {
+				// Remove the owner reference so the target continues to exist without the source
+				err := controllerutil.RemoveOwnerReference(source, target, r.Scheme)
+				if err != nil {
+					log.Error(err, "Failed to remove owner reference")
+					return ctrl.Result{}, err
+				}
+				// Remove deletion timestamp to prevent deletion
+				target.SetDeletionTimestamp(nil)
+				if err := r.Update(ctx, target); err != nil {
+					log.Error(err, "Failed to remove the deletion timestamp")
+					return ctrl.Result{}, err
+				}
+			}
+			// Remove the finalizer
+			controllerutil.RemoveFinalizer(source, r.Finalizer)
+			if err := r.Update(ctx, source); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		// Stop reconciliation as the item is being deleted
+		return ctrl.Result{}, nil
+	}
+
+	// Calculate kid
+	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
+
+	if !targetExists {
 		// Target doesn't exist -> initialize it
 		target := initializeLocalTarget(source, kid)
 
