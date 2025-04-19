@@ -58,11 +58,21 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+test: ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go run github.com/onsi/ginkgo/v2/ginkgo --skip-file=e2e -r --randomize-all --randomize-suites --race
+
+.PHONY: test-ci
+test-ci: ## Run tests in CI mode.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go run github.com/onsi/ginkgo/v2/ginkgo \
+		--skip-file=e2e -r --randomize-all --randomize-suites --fail-on-pending --keep-going --race --trace \
+		--cover --coverprofile=cover.profile --junit-report=junit.xml \
+		--poll-progress-after=120s --poll-progress-interval=30s \
+		--github-output
 
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
+test-e2e: ## Run the e2e tests. Expected an isolated environment using Kind.
 	@command -v kind >/dev/null 2>&1 || { \
 		echo "Kind is not installed. Please install Kind manually."; \
 		exit 1; \
@@ -71,7 +81,24 @@ test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated 
 		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
 		exit 1; \
 	}
-	go test ./test/e2e/ -v -ginkgo.v
+	go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --race ./test/e2e
+
+.PHONY: test-e2e-ci
+test-e2e-ci: ## Run the e2e tests in CI mode. Expected an isolated environment using Kind.
+	@command -v kind >/dev/null 2>&1 || { \
+		echo "Kind is not installed. Please install Kind manually."; \
+		exit 1; \
+	}
+	@kind get clusters | grep -q 'kind' || { \
+		echo "No Kind cluster is running. Please start a Kind cluster before running the e2e tests."; \
+		exit 1; \
+	}
+	go run github.com/onsi/ginkgo/v2/ginkgo \
+		-r --randomize-all --randomize-suites --fail-on-pending --keep-going --race --trace \
+		--cover --coverprofile=e2e-cover.profile --junit-report=report.xml \
+		--poll-progress-after=120s --poll-progress-interval=30s \
+		--github-output \
+		./test/e2e
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
