@@ -1,80 +1,157 @@
 # k8s-tls-rotator
 
-## Motivation
+This operator is designed to facilitate key/cert rotation for OAuth2 authorization servers based on
+TLS secrets stored in Kubernetes. The secret provided by this controller can be used as the basis
+for a JWK set.
 
-Create an operator that creates a history of the states of a k8s resource.
+## Why?
+
+We want to use cloud native solutions like cert-manager for maintaining our TLS certificates.
+However, maintaining a set of TLS keys and certs for building a JWK set is not trivial.
+
+To allow for regular rotation of keys, we need to consider the following problems when running our
+authorization server as a distributed system with multiple instances:
+- The server needs to continue serving the old key even after JWTs are signed with the new key, to
+  continue allowing clients to validate old tokens.
+- When using volume mounts to provide the keys to the authorization server, we need to consider the
+  time it takes for mount propagation to take place. As this will happen with eventual consistency,
+  we can't ensure that all pods serve the new key in time to allow for a smooth transition.
+
+Because of these problems, we always need the authorization server to serve a total of three keys in
+the JWK set:
+- The previous key, which needs to be available to verify requests that were signed before the
+  rotation
+- The active key, which is used to sign tokens
+- The next key, which will be the next active key and is already served to account for the mounting
+  delay in the next rotation
+
+This operator allows us to do this, while still enjoying the auto renewal capabilities of cert-manager.
 
 ## Architecture
 
-We have a source resource:
+![Architecture Diagram](./docs/architecture.svg)
+
+### Key rotation Process
+
+The operator is configured to reconcile a set of source secrets with the following annotations.
+- `rotator.gateway.mdw.telekom.de/source-secret`: A boolean value indicating whether this secret is
+a source secret
+- `rotator.gateway.mdw.telekom.de/destination-secret-name`: The name of the target secret to be
+created
+
+It will then create a target secret with the following structure:
 
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: key-latest
-annotations:
-  rotator.k8s.telekom.com/rotation-set: my-key
-  rotator.k8s.telekom.com/source: true
+  name: target-secret
+type: kubernetes.io/tls
 data:
-  someKey: someValue
-
+  prev-tls.crt: xxx
+  prev-tls.key: xxx
+  prev-tls.kid: xxx
+  tls.crt: ""
+  tls.key: ""
+  tls.kid: ""
+  next-tls.crt: ""
+  next-tls.key: ""
+  next-tls.kid: ""
 ```
-It is annotated with two labels:
-- `rotator.k8s.telekom.com/rotation-set`: Specifies the rotation set this resource belongs to
-- `rotator.k8s.telekom.com/source`: Marks the resource as the source for this rotation set
 
-Optional labels include:
-- `rotator.k8s.telekom.com/watch-path`: allows for watching a specific path in the resource (e.g. `.data.someKey`)
-  Default is the whole resource.
-- `rotator.k8s.telekom.com/rotate-path`: allows for only rotating contents in a specific path (e.g. everything in `.data`)
-  Default is the same as `watch-path`.
+`prev-tls.crt` and `prev-tls.key` now contain the key and cert from the source secret. The
+`prev-tls.kid` is a UUID based on a hash of the certificate and can be used as a KID in the JWK set.
+The other two sets of keys are currently empty and will subsequently be filled with the next
+rotation.
 
-We introduce a CRD, that is used to indicate a target resource.
+Once the source secret is updated with new values (e.g. by cert-manager), the operator will rotate
+the values:
+1. `tls.*` will be written to `next-tls.*`
+2. `prev-tls.*` will be written to `tls.*`
+3. The values from source will be written to `prev-tls.*`
 
-```yaml
-# example target 1
-apiVersion: rotator.k8s.telekom.com/v1
-kind: RotationTarget
+This happens on every change of the source.
+
+If a different source secret is created with the same target annotation, the operator will also
+trigger a rotation. If the values in the source are equal to the values in `prev-tls.*` the rotation
+will be skipped.
+
+[The secret controllers integration tests](./internal_controller/secret_controller_test.go) serve as
+a detailed specification of the controller's behavior.
+
+### Usage of certs/keys
+
+The authorization server should ***always*** expose all three keys in the JWK set.
+
+The values in `tls.*` should ***always*** be used for signing JWTs. This ensures that
+- resource servers are able to verify tokens signed with the previous key
+- the previously active key stays in the JWK set, ensuring verification is possible even with
+  mounting delays.
+
+## Development
+
+Local development is easiest done using a local [Kind](https://kind.sigs.k8s.io/) cluster.
+
+You can build and deploy changes to the operator in one step using the following command:
+```bash
+make docker-build IMG=rotator && kind load docker-image rotator && make deploy IMG=rotator`
+```
+This will build a docker image locally, load it into kind and deploy the operator into the `tls-rotator` namespace.
+Make sure you have set your `kubectl` context to use your kind cluster using `kubectl config use context kind-${your-cluster-name}`.
+
+You can then create a test secret using the following command:
+```bash
+cat <<EOF > secret.yaml
+apiVersion: v1
+kind: Secret
 metadata:
-  name: key-live
-spec:
-  rotationSet: my-key
-  rotationOrder: 1
-  rotationDelay: 1h
-  deletionMode: keep
+  name: source
+  annotations:
+    rotator.gateway.mdw.telekom.de/destination-secret-name: target
+    rotator.gateway.mdw.telekom.de/source-secret: "true"
+type: kubernetes.io/tls
+stringData:
+  tls.key: test-key
+  tls.crt: test-crt
+EOF
+
+kubectl apply -f secret.yaml
+```
+and watch the operator reconcile it.
+
+## Testing
+
+There are two types of tests in this project
+
+### Unit/Integration tests
+
+You can find these next to the controller in [`internal/controller`](./internal/controller).
+On first run you need to set up envtest on your local machine to be able to construct a test environment.
+```bash
+make setup-envtest
 ```
 
-```yaml
-# example target 2
-apiVersion: rotator.k8s.telekom.com/v1
-kind: RotationTarget
-metadata:
-  name: key-fallback
-spec:
-  rotationSet: my-key
-  rotationOrder: 2
-  rotationDelay: 5m
-  deletionMode: cascade
+You can then run the tests using either `make test`, or the `ginkgo` binary from the  `internal/controller` directory.
+
+### E2E tests
+
+These are tests generated by kubebuilder to test the operator in a real cluster.
+They test if the operator is able to deploy using the [manifests](./config) and
+the basic availability of the manager API and the metrics endpoint.
+
+In the future we could add additional functionality to these tests.
+
+You can run the tests using the following command:
+```bash
+make test-e2e
 ```
+The tests are expected to run against the kubectl context called `kind-kind`.
+You can change this by changing the variable `clusterName` in the e2e suite.
 
-The operator uses the CRD to create a new resource with the same content as the source.
+## Additional notes
 
-If the source changes, the following happens:
-- Content of *example target 1* is copied to *example target 2* 5m after source was updated
-- Content of source is copied to *example target 1* 1h after source was updated
-
-In general:
-- The content of the source is copied into the target with the lowest order.
-- The content of a target is copied into the resource with the next highest order.
-- The rotation into a target happens only after the specified delay from the time of the source change.
-- The content of the target with the highest order is discarded after the new content was rotated into it.
-
-## Open Questions
-
-- How do we handle the state, when the number of historical states < the number of rotationTargets?
-- How do we handle the case, that delay of a target with a lower order is smaller than one with a higher order?
-  In that case we would have to somehow keep track of the content of the first target
-- How do we handle the case, that the source is deleted? -> `deletionMode`
-- How do we handle source changes, that occur more frequently than target delays?
+The code generated by kubebuilder required for setting up CRDs or webhooks
+has been deleted in the manifests, Makefile, tests, etc., because it is not needed in the current scope of the operator.
+If you want to add any of these things in the future, we suggest either checking out an early commit of this project
+or scaffolding a new project and adding them back.
 
