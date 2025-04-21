@@ -78,18 +78,67 @@ jobs:
           go-version-file: go.mod
           go-package: ./...
 
+  check-changes:
+    name: Check which files changed
+    runs-on: ubuntu-latest
+    # Required permissions
+    permissions:
+      pull-requests: read
+    # Set job outputs to values from filter step
+    outputs:
+      deps: ${{ steps.filter.outputs.deps }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          deps:
+            - 'go.sum'
+
   ort:
     name: ORT scan
     runs-on: ubuntu-latest
+    needs:
+      - check-changes
+    # Only run if deps have changed
+    if: ${{ needs.check-changes.outputs.deps == 'true' }}
     steps:
       - name: Use HTTPS for Git cloning
         run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
       - name: Checkout project
         uses: actions/checkout@v3
+      - name: Prepare ORT config
+        # This allows us to customize the default ORT config available at
+        # https://github.com/oss-review-toolkit/ort-config
+        # using our own config file stored in .github/ort/config.yml
+        # Note that this is the global config, not the repo specific one
+        run: |
+          # Move into default config dir
+          export ORT_CONFIG_DIR=$HOME/.ort/config
+          mkdir -p ${ORT_CONFIG_DIR}
+          cd ${ORT_CONFIG_DIR}
+          # Checkout default config repo
+          git init -q
+          git remote add origin https://github.com/oss-review-toolkit/ort-config.git
+          git fetch -q --depth 1 origin main
+          git checkout -q FETCH_HEAD
+          # Copy custom config into config dir
+          cp ${GITHUB_WORKSPACE}/.github/ort/config.yml ${ORT_CONFIG_DIR}
       - name: Run GitHub Action for ORT
         uses: oss-review-toolkit/ort-ci-github-action@v1
         with:
           fail-on: violations
+          run: >
+            cache-dependencies,
+            cache-scan-results,
+            labels,
+            analyzer,
+            scanner,
+            advisor,
+            evaluator,
+            reporter,
+            upload-results
 
   # ----------
   # Build jobs
