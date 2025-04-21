@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package e2e
+package e2e_test
 
 import (
 	"fmt"
@@ -20,14 +20,14 @@ var (
 	// with the code source changes to be tested.
 	projectImage = "k8s-tls-rotator"
 
-	// clusterName is the name of the kind cluster which will be used
+	// clusterName is the name of the kind cluster which will be used.
 	clusterName = "kind"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
 // temporary environment to validate project changes with the the purposed to be used in CI jobs.
 // Tests will likely fail if they aren't run in a completely clean kind cluster.
-// This setup requires Kind and builds/loads the Manager Docker image locally
+// This setup requires Kind and builds/loads the Manager Docker image locally.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	_, _ = fmt.Fprintf(GinkgoWriter, "Starting k8s-tls-rotator integration test suite\n")

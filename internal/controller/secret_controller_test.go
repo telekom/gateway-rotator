@@ -6,7 +6,6 @@ package controller_test
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,7 +41,7 @@ var _ = Describe("Secret Controller", Serial, func() {
 		Expect(err).NotTo(HaveOccurred(), "deletion of secret failed during cleanup")
 		Eventually(func(g Gomega) {
 			secrets := &corev1.SecretList{}
-			err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
+			err = k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(secrets.Items).To(BeEmpty())
 
@@ -70,7 +69,11 @@ var _ = Describe("Secret Controller", Serial, func() {
 
 			// wait for the target secret to be created
 			Eventually(func(g Gomega) {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)
+				err := k8sClient.Get(
+					ctx,
+					types.NamespacedName{Name: "target", Namespace: namespace},
+					target,
+				)
 				g.Expect(err).ShouldNot(HaveOccurred())
 			}, timeout, interval).Should(Succeed(), "controller did not create target secret within timeout")
 		})
@@ -91,7 +94,9 @@ var _ = Describe("Secret Controller", Serial, func() {
 			})
 
 			By("generating a UUID based on the cert and setting it as a kid", func() {
-				Expect(target.Data["next-tls.kid"]).To(Equal(generateUuid(string(source.Data["tls.crt"]))))
+				Expect(
+					target.Data["next-tls.kid"],
+				).To(Equal(generateUuid(string(source.Data["tls.crt"]))))
 			})
 
 			By("setting secret type tls", func() {
@@ -109,15 +114,22 @@ var _ = Describe("Secret Controller", Serial, func() {
 			Context("and the cert in source and next-tls.crt are equal", func() {
 				BeforeEach(func() {
 					// we will just update an annotation to trigger a change
-					err := k8sClient.Get(ctx, types.NamespacedName{Name: "source", Namespace: namespace}, source)
+					err := k8sClient.Get(
+						ctx,
+						types.NamespacedName{Name: "source", Namespace: namespace},
+						source,
+					)
 					Expect(err).ToNot(HaveOccurred())
 					source.Annotations["some-new-annotation"] = "some-new-value"
-					Expect(k8sClient.Update(ctx, source)).To(Succeed(), "update of source secret failed")
+					Expect(
+						k8sClient.Update(ctx, source),
+					).To(Succeed(), "update of source secret failed")
 				})
 				It("does not update the target secret", func() {
 					time.Sleep(time.Second * 2) // give controller a chance to reconcile
 					Consistently(func(g Gomega) {
-						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).To(Succeed())
+						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).
+							To(Succeed())
 						_, ok := target.Annotations["some-new-annotation"]
 						g.Expect(ok).To(BeFalse(), "target secret should not have been touched")
 					}, timeout, interval).Should(Succeed(), "the target secret should not have been updated")
@@ -127,19 +139,29 @@ var _ = Describe("Secret Controller", Serial, func() {
 			Context("and the cert in source and next-tls.crt are different", func() {
 				It("is able to perform a full rotation", func() {
 					By("(1) manually changing the source", func() {
-						err := k8sClient.Get(ctx, types.NamespacedName{Name: "source", Namespace: namespace}, source)
+						err := k8sClient.Get(
+							ctx,
+							types.NamespacedName{Name: "source", Namespace: namespace},
+							source,
+						)
 						Expect(err).ToNot(HaveOccurred())
 						source.Data["tls.crt"] = []byte("cert-rotation-1")
 						source.Data["tls.key"] = []byte("key-rotation-1")
-						Expect(k8sClient.Update(ctx, source)).To(Succeed(), "update of source secret by test runner failed")
+						Expect(
+							k8sClient.Update(ctx, source),
+						).To(Succeed(), "update of source secret by test runner failed")
 					})
 
 					By("(1) the values are rotated", func() {
 						Eventually(func(g Gomega) {
-							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).To(Succeed())
-							g.Expect(target.Data["next-tls.crt"]).To(Equal([]byte("cert-rotation-1")))
-							g.Expect(target.Data["next-tls.key"]).To(Equal([]byte("key-rotation-1")))
-							g.Expect(target.Data["next-tls.kid"]).To(Equal(generateUuid("cert-rotation-1")))
+							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).
+								To(Succeed())
+							g.Expect(target.Data["next-tls.crt"]).
+								To(Equal([]byte("cert-rotation-1")))
+							g.Expect(target.Data["next-tls.key"]).
+								To(Equal([]byte("key-rotation-1")))
+							g.Expect(target.Data["next-tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-1")))
 							g.Expect(target.Data["tls.crt"]).To(Equal([]byte("cert")))
 							g.Expect(target.Data["tls.key"]).To(Equal([]byte("key")))
 							g.Expect(target.Data["tls.kid"]).To(Equal(generateUuid("cert")))
@@ -150,22 +172,33 @@ var _ = Describe("Secret Controller", Serial, func() {
 					})
 
 					By("(2) manually changing the source", func() {
-						err := k8sClient.Get(ctx, types.NamespacedName{Name: "source", Namespace: namespace}, source)
+						err := k8sClient.Get(
+							ctx,
+							types.NamespacedName{Name: "source", Namespace: namespace},
+							source,
+						)
 						Expect(err).ToNot(HaveOccurred())
 						source.Data["tls.crt"] = []byte("cert-rotation-2")
 						source.Data["tls.key"] = []byte("key-rotation-2")
-						Expect(k8sClient.Update(ctx, source)).To(Succeed(), "update of source secret by test runner failed")
+						Expect(
+							k8sClient.Update(ctx, source),
+						).To(Succeed(), "update of source secret by test runner failed")
 					})
 
 					By("(2) the values are rotated", func() {
 						Eventually(func(g Gomega) {
-							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).To(Succeed())
-							g.Expect(target.Data["next-tls.crt"]).To(Equal([]byte("cert-rotation-2")))
-							g.Expect(target.Data["next-tls.key"]).To(Equal([]byte("key-rotation-2")))
-							g.Expect(target.Data["next-tls.kid"]).To(Equal(generateUuid("cert-rotation-2")))
+							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).
+								To(Succeed())
+							g.Expect(target.Data["next-tls.crt"]).
+								To(Equal([]byte("cert-rotation-2")))
+							g.Expect(target.Data["next-tls.key"]).
+								To(Equal([]byte("key-rotation-2")))
+							g.Expect(target.Data["next-tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-2")))
 							g.Expect(target.Data["tls.crt"]).To(Equal([]byte("cert-rotation-1")))
 							g.Expect(target.Data["tls.key"]).To(Equal([]byte("key-rotation-1")))
-							g.Expect(target.Data["tls.kid"]).To(Equal(generateUuid("cert-rotation-1")))
+							g.Expect(target.Data["tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-1")))
 							g.Expect(target.Data["prev-tls.crt"]).To(Equal([]byte("cert")))
 							g.Expect(target.Data["prev-tls.key"]).To(Equal([]byte("key")))
 							g.Expect(target.Data["prev-tls.kid"]).To(Equal(generateUuid("cert")))
@@ -173,25 +206,40 @@ var _ = Describe("Secret Controller", Serial, func() {
 					})
 
 					By("(3) manually changing the source", func() {
-						err := k8sClient.Get(ctx, types.NamespacedName{Name: "source", Namespace: namespace}, source)
+						err := k8sClient.Get(
+							ctx,
+							types.NamespacedName{Name: "source", Namespace: namespace},
+							source,
+						)
 						Expect(err).ToNot(HaveOccurred())
 						source.Data["tls.crt"] = []byte("cert-rotation-3")
 						source.Data["tls.key"] = []byte("key-rotation-3")
-						Expect(k8sClient.Update(ctx, source)).To(Succeed(), "update of source secret by test runner failed")
+						Expect(
+							k8sClient.Update(ctx, source),
+						).To(Succeed(), "update of source secret by test runner failed")
 					})
 
 					By("(3) the values are rotated", func() {
 						Eventually(func(g Gomega) {
-							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).To(Succeed())
-							g.Expect(target.Data["next-tls.crt"]).To(Equal([]byte("cert-rotation-3")))
-							g.Expect(target.Data["next-tls.key"]).To(Equal([]byte("key-rotation-3")))
-							g.Expect(target.Data["next-tls.kid"]).To(Equal(generateUuid("cert-rotation-3")))
+							g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).
+								To(Succeed())
+							g.Expect(target.Data["next-tls.crt"]).
+								To(Equal([]byte("cert-rotation-3")))
+							g.Expect(target.Data["next-tls.key"]).
+								To(Equal([]byte("key-rotation-3")))
+							g.Expect(target.Data["next-tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-3")))
 							g.Expect(target.Data["tls.crt"]).To(Equal([]byte("cert-rotation-2")))
 							g.Expect(target.Data["tls.key"]).To(Equal([]byte("key-rotation-2")))
-							g.Expect(target.Data["tls.kid"]).To(Equal(generateUuid("cert-rotation-2")))
-							g.Expect(target.Data["prev-tls.crt"]).To(Equal([]byte("cert-rotation-1")))
-							g.Expect(target.Data["prev-tls.key"]).To(Equal([]byte("key-rotation-1")))
-							g.Expect(target.Data["prev-tls.kid"]).To(Equal(generateUuid("cert-rotation-1")))
+							g.Expect(target.Data["tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-2")))
+							g.Expect(target.Data["prev-tls.crt"]).
+								To(Equal([]byte("cert-rotation-1")))
+							g.Expect(target.Data["prev-tls.key"]).
+								To(Equal([]byte("key-rotation-1")))
+							g.Expect(target.Data["prev-tls.kid"]).
+								To(Equal(generateUuid("cert-rotation-1")))
+
 						}, timeout, interval).Should(Succeed(), "controller did not produce the expected target secret within timeout")
 					})
 				})
@@ -205,7 +253,11 @@ var _ = Describe("Secret Controller", Serial, func() {
 			})
 			It("keeps the target secret", func() {
 				Eventually(func(g Gomega) {
-					err := k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)
+					err := k8sClient.Get(
+						ctx,
+						types.NamespacedName{Name: "target", Namespace: namespace},
+						target,
+					)
 					g.Expect(err).ShouldNot(HaveOccurred())
 
 					By("removing the owner reference")
@@ -238,7 +290,9 @@ var _ = Describe("Secret Controller", Serial, func() {
 				secrets := &corev1.SecretList{}
 				err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 				Expect(err).ToNot(HaveOccurred(), "failed to list secrets")
-				Expect(secrets.Items).To(HaveLen(1), "controller should not have created a target secret")
+				Expect(
+					secrets.Items,
+				).To(HaveLen(1), "controller should not have created a target secret")
 			}, timeout, interval).Should(Succeed())
 		})
 	})
@@ -267,7 +321,9 @@ var _ = Describe("Secret Controller", Serial, func() {
 				secrets := &corev1.SecretList{}
 				err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 				Expect(err).ToNot(HaveOccurred(), "failed to list secrets")
-				Expect(secrets.Items).To(HaveLen(1), "controller should not have created a target secret")
+				Expect(
+					secrets.Items,
+				).To(HaveLen(1), "controller should not have created a target secret")
 			}, timeout, interval).Should(Succeed())
 		})
 	})
@@ -294,19 +350,21 @@ var _ = Describe("Secret Controller", Serial, func() {
 				secrets := &corev1.SecretList{}
 				err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 				Expect(err).ToNot(HaveOccurred(), "failed to list secrets")
-				Expect(secrets.Items).To(HaveLen(1), "controller should not have created a target secret")
+				Expect(
+					secrets.Items,
+				).To(HaveLen(1), "controller should not have created a target secret")
 			}, timeout, interval).Should(Succeed())
 		})
 	})
 
 	Context("error handling and edge cases", func() {
-		var error error
+		var err error
 		var erroringClient errorInjectingClient
 		var reconciler controller.SecretReconciler
 		JustBeforeEach(func() {
 			erroringClient = errorInjectingClient{
 				Client:       k8sClient,
-				errorToThrow: error,
+				errorToThrow: err,
 			}
 
 			reconciler = controller.SecretReconciler{
@@ -320,10 +378,11 @@ var _ = Describe("Secret Controller", Serial, func() {
 
 		When("a reconcile is triggered and the resource is not found", func() {
 			BeforeEach(func() {
-				error = errors.NewNotFound(schema.GroupResource{}, "not found error")
+				err = errors.NewNotFound(schema.GroupResource{}, "not found error")
 			})
 			It("returns no error and does nothing", func() {
-				val, err := reconciler.Reconcile(ctx, ctrl.Request{
+				var val ctrl.Result
+				val, err = reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "test-secret",
 						Namespace: "default",
@@ -333,31 +392,34 @@ var _ = Describe("Secret Controller", Serial, func() {
 				Expect(val).To(BeEquivalentTo(ctrl.Result{}))
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
-					err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
+					err = k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 					g.Expect(err).ToNot(HaveOccurred(), "failed to list secrets")
-					g.Expect(secrets.Items).To(BeEmpty(), "controller should not have created a target secret")
+					g.Expect(secrets.Items).
+						To(BeEmpty(), "controller should not have created a target secret")
 				}, timeout, interval).Should(Succeed())
 			})
 		})
 
 		When("there is different error while fetching the resource", func() {
 			BeforeEach(func() {
-				error = fmt.Errorf("some undefined err")
+				err = errors.NewBadRequest("some undefined err")
 			})
 			It("returns the error and does nothing", func() {
-				val, err := reconciler.Reconcile(ctx, ctrl.Request{
+				var val ctrl.Result
+				val, err = reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Name:      "test-secret",
 						Namespace: "default",
 					},
 				})
 				Expect(val).To(BeEquivalentTo(ctrl.Result{}))
-				Expect(err).To(BeEquivalentTo(fmt.Errorf("some undefined err")))
+				Expect(err).To(BeEquivalentTo(errors.NewBadRequest("some undefined err")))
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
-					err := k8sClient.List(ctx, secrets, client.InNamespace(namespace))
+					err = k8sClient.List(ctx, secrets, client.InNamespace(namespace))
 					g.Expect(err).ToNot(HaveOccurred(), "failed to list secrets")
-					g.Expect(secrets.Items).To(BeEmpty(), "controller should not have created a target secret")
+					g.Expect(secrets.Items).
+						To(BeEmpty(), "controller should not have created a target secret")
 				}, timeout, interval).Should(Succeed())
 			})
 		})
@@ -365,13 +427,18 @@ var _ = Describe("Secret Controller", Serial, func() {
 
 })
 
-// Simple extension of the client.Client interface that is able to inject errors
+// Simple extension of the client.Client interface that is able to inject errors.
 type errorInjectingClient struct {
 	client.Client
 	errorToThrow error
 }
 
-func (c errorInjectingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+func (c errorInjectingClient) Get(
+	ctx context.Context,
+	key client.ObjectKey,
+	obj client.Object,
+	opts ...client.GetOption,
+) error {
 	if c.errorToThrow != nil {
 		return c.errorToThrow
 	}

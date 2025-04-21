@@ -37,7 +37,7 @@ var (
 	namespace string = "default"
 )
 
-// TestControllers is the entry point for all tests in controller_test
+// TestControllers is the entry point for all tests in controller_test.
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 

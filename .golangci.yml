@@ -443,3 +443,8 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+          - forbidigo
+          - fatcontext
+          - gochecknoglobals
+          - staticcheck
+          - revive
