@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package e2e
+package e2e_test
 
 import (
 	"fmt"
@@ -15,16 +15,16 @@ import (
 	"gw.mdw.telekom.de/rotator/test/utils"
 )
 
-// namespace where the project is deployed in
+// namespace where the project is deployed in.
 const namespace = "k8s-tls-rotator-system"
 
-// serviceAccountName created for the project
+// serviceAccountName created for the project.
 const serviceAccountName = "k8s-tls-rotator-controller-manager"
 
-// metricsServiceName is the name of the metrics service of the project
+// metricsServiceName is the name of the metrics service of the project.
 const metricsServiceName = "k8s-tls-rotator-controller-manager-metrics-service"
 
-// metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
+// metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data.
 const metricsRoleBindingName = "k8s-tls-rotator-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
@@ -172,8 +172,9 @@ var _ = Describe("Manager", Ordered, func() {
 
 			By("waiting for the metrics endpoint to be ready")
 			verifyMetricsEndpointReady := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "endpoints", metricsServiceName, "-n", namespace)
-				output, err := utils.Run(cmd)
+				cmd = exec.Command("kubectl", "get", "endpoints", metricsServiceName, "-n", namespace)
+				var output string
+				output, err = utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(ContainSubstring("8082"), "Metrics endpoint is not ready")
 			}
@@ -181,8 +182,9 @@ var _ = Describe("Manager", Ordered, func() {
 
 			By("verifying that the controller manager is serving the metrics server")
 			verifyMetricsServerStarted := func(g Gomega) {
-				cmd := exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
-				output, err := utils.Run(cmd)
+				cmd = exec.Command("kubectl", "logs", controllerPodName, "-n", namespace)
+				var output string
+				output, err = utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(ContainSubstring("controller-runtime.metrics\tServing metrics server"),
 					"Metrics server not yet started")
@@ -221,10 +223,11 @@ var _ = Describe("Manager", Ordered, func() {
 
 			By("waiting for the curl-metrics pod to complete.")
 			verifyCurlUp := func(g Gomega) {
-				cmd := exec.Command("kubectl", "get", "pods", "curl-metrics",
+				cmd = exec.Command("kubectl", "get", "pods", "curl-metrics",
 					"-o", "jsonpath={.status.phase}",
 					"-n", namespace)
-				output, err := utils.Run(cmd)
+				var output string
+				output, err = utils.Run(cmd)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(output).To(Equal("Succeeded"), "curl pod in wrong status")
 			}

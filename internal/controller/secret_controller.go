@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-// SecretReconciler reconciles secrets with the proper source annotation
+// SecretReconciler reconciles secrets with the proper source annotation.
 type SecretReconciler struct {
 	client.Client
 	Scheme               *runtime.Scheme
@@ -69,56 +69,30 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	if source.ObjectMeta.DeletionTimestamp.IsZero() {
+	if source.ObjectMeta.DeletionTimestamp.IsZero() && !controllerutil.ContainsFinalizer(source, r.Finalizer) {
 		// Source is not being deleted, add finalizer if not present
-		if !controllerutil.ContainsFinalizer(source, r.Finalizer) {
-			log.Info("Adding finalizer to source secret")
-			controllerutil.AddFinalizer(source, r.Finalizer)
-			if err := r.Update(ctx, source); err != nil {
-				return ctrl.Result{}, err
-			}
+		log.Info("Adding finalizer to source secret")
+		controllerutil.AddFinalizer(source, r.Finalizer)
+		if err = r.Update(ctx, source); err != nil {
+			return ctrl.Result{}, err
 		}
-	} else {
-		// Source is being deleted, prevent garbage collection of target secret
-		log.Info("Source secret is under deletion. Keeping target and removing owner reference")
-		if controllerutil.ContainsFinalizer(source, r.Finalizer) {
-			if targetExists {
-				// Remove the owner reference so the target continues to exist without the source
-				err := controllerutil.RemoveOwnerReference(source, target, r.Scheme)
-				if err != nil {
-					log.Error(err, "Failed to remove owner reference")
-					return ctrl.Result{}, err
-				}
-				// Remove deletion timestamp to prevent deletion
-				target.SetDeletionTimestamp(nil)
-				if err := r.Update(ctx, target); err != nil {
-					log.Error(err, "Failed to remove the deletion timestamp")
-					return ctrl.Result{}, err
-				}
-			}
-			// Remove the finalizer
-			controllerutil.RemoveFinalizer(source, r.Finalizer)
-			if err := r.Update(ctx, source); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		// Stop reconciliation as the item is being deleted
-		return ctrl.Result{}, nil
+	} else if !source.ObjectMeta.DeletionTimestamp.IsZero() {
+		return handleDeletion(ctx, r, source, target, targetExists)
 	}
 
 	// Calculate kid
 	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
 
-	if !targetExists {
+	if !targetExists { //nolint:nestif // would be more complex if it was in separate method
 		// Target doesn't exist -> initialize it
 		target := initializeLocalTarget(source, kid)
 
-		if err := controllerutil.SetControllerReference(source, &target, r.Scheme); err != nil {
+		if err = controllerutil.SetControllerReference(source, &target, r.Scheme); err != nil {
 			log.Error(err, "Failed to set controller reference")
 			return ctrl.Result{}, err
 		}
 
-		if err := r.Create(ctx, &target); err != nil {
+		if err = r.Create(ctx, &target); err != nil {
 			log.Error(err, "Failed to create target secret")
 			return ctrl.Result{}, err
 		}
@@ -134,13 +108,13 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Info("Updating target secret with rotated values")
 		updateLocalTargetData(target, source, kid)
 
-		if err := controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
+		if err = controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
 			log.Error(err, "Failed to set controller reference")
 			return ctrl.Result{}, err
 		}
 
 		// Update the target secret
-		if err := r.Update(ctx, target); err != nil {
+		if err = r.Update(ctx, target); err != nil {
 			log.Error(err, "Failed to update target secret")
 			return ctrl.Result{}, err
 		}
@@ -150,9 +124,8 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 // SetupWithManager sets up the controller with the Manager.
-// It filters the events to only those secrets with the source annotation
+// It filters the events to only those secrets with the source annotation.
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
 	secretPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		secret, ok := obj.(*corev1.Secret)
 		if !ok {
@@ -221,4 +194,41 @@ func updateLocalTargetData(target *corev1.Secret, source *corev1.Secret, kid uui
 
 	// Update the target secret
 	target.Data = updatedData
+}
+
+// handleDeletion prevents garbage collection of target secret if the source secret is being deleted.
+func handleDeletion(
+	ctx context.Context,
+	r *SecretReconciler,
+	source *corev1.Secret,
+	target *corev1.Secret,
+	targetExists bool) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	if !controllerutil.ContainsFinalizer(source, r.Finalizer) {
+		log.Info("Source secret is marked for deletion and doesn't have a finalizer. Skipping.")
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Source secret is under deletion. Keeping target and removing owner reference")
+	if targetExists {
+		// Remove the owner reference so the target continues to exist without the source
+		err := controllerutil.RemoveOwnerReference(source, target, r.Scheme)
+		if err != nil {
+			log.Error(err, "Failed to remove owner reference")
+			return ctrl.Result{}, err
+		}
+		// Remove deletion timestamp to prevent deletion
+		target.SetDeletionTimestamp(nil)
+		if err = r.Update(ctx, target); err != nil {
+			log.Error(err, "Failed to remove the deletion timestamp")
+			return ctrl.Result{}, err
+		}
+	}
+	// Remove the finalizer
+	controllerutil.RemoveFinalizer(source, r.Finalizer)
+	if err := r.Update(ctx, source); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }
