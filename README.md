@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Deutsche Telekom IT GmbH
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # k8s-tls-rotator
 
 This operator is designed to facilitate key/cert rotation for OAuth2 authorization servers based on
