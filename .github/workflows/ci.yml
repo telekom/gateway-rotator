@@ -75,6 +75,7 @@ jobs:
       - id: govulncheck
         uses: golang/govulncheck-action@v1
         with:
+          go-version-input: '' # default is 'stable' which overrides the file input
           go-version-file: go.mod
           go-package: ./...
 
