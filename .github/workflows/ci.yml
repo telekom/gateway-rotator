@@ -67,18 +67,6 @@ jobs:
       - name: Ensure nothing has changed
         run: git diff --exit-code -- . ':!go.sum' ':!go.mod'
 
-  govulncheck:
-    # this also scans dependencies
-    name: Check for vulnerabilities (govulncheck)
-    runs-on: ubuntu-latest
-    steps:
-      - id: govulncheck
-        uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: '' # default is 'stable' which overrides the file input
-          go-version-file: go.mod
-          go-package: ./...
-
   check-changes:
     name: Check which files changed
     runs-on: ubuntu-latest
@@ -171,6 +159,20 @@ jobs:
   # ---------
   # Test jobs
   # ---------
+  govulncheck:
+    # this also scans dependencies
+    name: Check for vulnerabilities (govulncheck)
+    runs-on: ubuntu-latest
+    needs:
+      - build-go
+    steps:
+      - id: govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: '' # default is 'stable' which overrides the file input
+          go-version-file: go.mod
+          go-package: ./...
+
   test-go-unit:
     name: Run unit tests
     runs-on: ubuntu-latest
@@ -285,6 +287,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-go
+      - test-go-unit
+      - test-go-e2e
     outputs:
       image-digest: ${{ steps.build-push.outputs.image-digest }}
       image-tag: ${{ steps.build-push.outputs.image-digest }}
