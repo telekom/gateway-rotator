@@ -4,7 +4,7 @@
 
 name: CI
 
-# Required env vars:
+# Required secrets:
 # - REGISTRY_HOST: e.g. mtr.devops.telekom.de
 # - REGISTRY_REPO: e.g. /tardis-internal/gateway/rotator
 # - REGISTRY_AUTH_USER: Name of MTR robot user
@@ -313,13 +313,13 @@ jobs:
           echo "Image tag will be: ${TAG}"
       - name: Login to registry
         run: |
-          ko login ${REGISTRY_HOST} \
-          --username "${REGISTRY_AUTH_USER}" \
-          --password "${REGISTRY_AUTH_TOKEN}"
+          ko login ${{ secrets.REGISTRY_HOST }} \
+          --username "${{ secrets.REGISTRY_AUTH_USER }}" \
+          --password "${{ secrets.REGISTRY_AUTH_TOKEN }}"
       - name: Build and push
         id: build-push
         run: |
-          export KO_DOCKER_REPO=${REGISTRY_HOST}${REGISTRY_REPO}
+          export KO_DOCKER_REPO=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
           export SOURCE_DATE_EPOCH=$(date +%s)
           export GOFLAGS="-buildvcs=false"
           ko build \
@@ -339,10 +339,10 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         env:
-          TRIVY_USERNAME: ${{ vars.REGISTRY_AUTH_USER }}
-          TRIVY_PASSWORD: ${{ vars.REGISTRY_AUTH_TOKEN }}
+          TRIVY_USERNAME: ${{ secrets.REGISTRY_AUTH_USER }}
+          TRIVY_PASSWORD: ${{ secrets.REGISTRY_AUTH_TOKEN }}
         with:
-          image-ref: '${{ vars.REGISTRY_HOST }}${{ vars.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}'
+          image-ref: '${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}'
           exit-code: '1'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -358,10 +358,11 @@ jobs:
         uses: sigstore/cosign-installer@v3.8.1
       - name: Sign image
         run: |
+          export COSIGN_KEY=${{ secrets.COSIGN_KEY }}
           cosign sign \
             --key "env://COSIGN_KEY" \
             -a "repo=${{ github.repository }}" \
             -a "commit-sha=${{ github.sha }}" \
             --tlog-upload=false \
             -y \
-            "${REGISTRY_HOST}${REGISTRY_REPO}@${{ needs.build-push-image.outputs.image-digest }}"
+            "${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}"
