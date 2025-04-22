@@ -4,9 +4,7 @@
 
 module gw.mdw.telekom.de/rotator
 
-go 1.23.0
-
-godebug default=go1.23
+go 1.23.1
 
 require (
 	github.com/google/uuid v1.6.0
