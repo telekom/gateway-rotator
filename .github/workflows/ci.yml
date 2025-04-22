@@ -293,7 +293,7 @@ jobs:
       - test-go-unit
       - test-go-e2e
     outputs:
-      image-digest: ${{ steps.build-push.outputs.image-digest }}
+      image-digest: ${{ steps.build-push.outputs.digest }}
       image-tag: ${{ steps.build-push.outputs.image-digest }}
     steps:
       - name: Checkout
@@ -309,8 +309,6 @@ jobs:
             ~/.cache/go-build
             ~/.go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      - name: Setup ko
-        uses: ko-build/setup-ko@v0.8
       - name: Inject slug vars
         uses: rlespinasse/github-slug-action@v5
       - name: Determine tag
@@ -324,23 +322,23 @@ jobs:
           echo "Image tag will be: ${TAG}"
           echo "image-tag=${TAG}" >> "${GITHUB_OUTPUT}"
       - name: Login to registry
-        run: |
-          ko login ${{ secrets.REGISTRY_HOST }} \
-          --username "${{ secrets.REGISTRY_AUTH_USER }}" \
-          --password "${{ secrets.REGISTRY_AUTH_TOKEN }}"
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_HOST }}
+          username: ${{ secrets.REGISTRY_AUTH_USER }}
+          password: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Build and push
         id: build-push
-        run: |
-          export KO_DOCKER_REPO=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
-          export SOURCE_DATE_EPOCH=$(date +%s)
-          export GOFLAGS="-buildvcs=false"
-          ko build \
-            --bare \
-            --tags "${{ steps.tag.outputs.image-tag }}" \
-            ./cmd | sed 's/.*@//'  > ./digest
-          export DIGEST=$(cat ./digest)
-          echo "Digest: ${DIGEST}"
-          echo "image-digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:${{ steps.tag.outputs.image-tag }}
+          cache-from: type=registry,ref=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:latest
+          cache-to: type=inline
 
   scan-image:
     name: Scan image
