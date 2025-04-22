@@ -316,10 +316,10 @@ jobs:
       - name: Determine tag
         id: tag
         run: |
-          if [[ "${GITHUB_HEAD_REF_SLUG}" == "main" ]]; then
+          if [[ "${GITHUB_REF_POINT_SLUG}" == "main" ]]; then
             export TAG="latest"
           else
-            export TAG="${GITHUB_HEAD_REF_SLUG}-${GITHUB_RUN_ID}"
+            export TAG="${GITHUB_REF_POINT_SLUG}-${GITHUB_RUN_ID}"
           fi
           echo "Image tag will be: ${TAG}"
           echo "image-tag=${TAG}" >> "${GITHUB_OUTPUT}"
