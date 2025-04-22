@@ -139,10 +139,13 @@ jobs:
   build-go:
     name: Build Go code
     runs-on: ubuntu-latest
+    outputs:
+      go-version: ${{ steps.setup-go.outputs.go-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Go
+        id: setup-go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -296,19 +299,6 @@ jobs:
       image-digest: ${{ steps.build-push.outputs.digest }}
       image-tag: ${{ steps.build-push.outputs.image-digest }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Restore Go cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/.go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
       - name: Inject slug vars
         uses: rlespinasse/github-slug-action@v5
       - name: Determine tag
@@ -335,6 +325,7 @@ jobs:
         id: build-push
         uses: docker/build-push-action@v6
         with:
+          build-args: GO_VERSION=${{ needs.build-go.outputs.go-version }}
           push: true
           tags: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:${{ steps.tag.outputs.image-tag }}
           cache-from: type=registry,ref=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:latest

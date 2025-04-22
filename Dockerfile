@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Build the manager binary
-FROM docker.io/golang:1.23 AS builder
+ARG GO_VERSION=latest
+FROM docker.io/golang:${GO_VERSION} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
