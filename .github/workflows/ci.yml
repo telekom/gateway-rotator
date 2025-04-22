@@ -285,6 +285,7 @@ jobs:
       - build-go
     outputs:
       image-digest: ${{ steps.build-push.outputs.image-digest }}
+      image-tag: ${{ steps.build-push.outputs.image-digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -304,6 +305,7 @@ jobs:
       - name: Inject slug vars
         uses: rlespinasse/github-slug-action@v5
       - name: Determine tag
+        id: tag
         run: |
           if [[ "${GITHUB_HEAD_REF_SLUG}" == "main" ]]; then
             export TAG="latest"
@@ -311,6 +313,7 @@ jobs:
             export TAG="${GITHUB_HEAD_REF_SLUG}-${GITHUB_RUN_ID}"
           fi
           echo "Image tag will be: ${TAG}"
+          echo "image-tag=${TAG}" >> "${GITHUB_OUTPUT}"
       - name: Login to registry
         run: |
           ko login ${{ secrets.REGISTRY_HOST }} \
@@ -324,11 +327,11 @@ jobs:
           export GOFLAGS="-buildvcs=false"
           ko build \
             --bare \
-            --tags "${TAG}" \
+            --tags "${{ steps.tag.outputs.image-tag }}" \
             ./cmd | sed 's/.*@//'  > ./digest
           export DIGEST=$(cat ./digest)
           echo "Digest: ${DIGEST}"
-          echo "image-digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image-digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
 
   scan-image:
     name: Scan image
