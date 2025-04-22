@@ -73,17 +73,20 @@ jobs:
     # Required permissions
     permissions:
       pull-requests: read
+      contents: read
     # Set job outputs to values from filter step
     outputs:
       deps: ${{ steps.filter.outputs.deps }}
     steps:
-    # For pull requests it's not necessary to checkout the code
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: |
-          deps:
-            - 'go.sum'
+      - name: Checkout project
+        if: github.event_name == 'push' # Checkout not necessary for PRs
+        uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            deps:
+              - 'go.sum'
 
   ort:
     name: ORT scan
