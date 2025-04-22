@@ -362,6 +362,7 @@ jobs:
     needs:
       - build-push-image
       - scan-image
+      - govulncheck
     steps:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.8.1
