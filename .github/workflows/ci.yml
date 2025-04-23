@@ -360,9 +360,8 @@ jobs:
         uses: sigstore/cosign-installer@v3.8.1
       - name: Sign image
         run: |
-          export COSIGN_KEY=${{ secrets.COSIGN_KEY }}
           cosign sign \
-            --key "env://COSIGN_KEY" \
+            --key "${{ secrets.COSIGN_KEY }}" \
             -a "repo=${{ github.repository }}" \
             -a "commit-sha=${{ github.sha }}" \
             --tlog-upload=false \
