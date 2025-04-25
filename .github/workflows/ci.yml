@@ -79,7 +79,7 @@ jobs:
       deps: ${{ steps.filter.outputs.deps }}
     steps:
       - name: Checkout project
-        if: github.event_name == 'push' # Checkout not necessary for PRs
+        if: github.event_name != 'pull_request' # Checkout not necessary for PRs
         uses: actions/checkout@v3
       - uses: dorny/paths-filter@v3
         id: filter
