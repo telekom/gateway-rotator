@@ -93,9 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - check-changes
-    # Only run if deps have changed
-    #if: ${{ needs.check-changes.outputs.deps == 'true' }}
-    if: false # skip until it's  performant
+    #if: ${{ needs.check-changes.outputs.deps == 'true' }} # Only run if deps have changed
     steps:
       - name: Use HTTPS for Git cloning
         run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
@@ -122,6 +120,8 @@ jobs:
         uses: oss-review-toolkit/ort-ci-github-action@v1
         with:
           fail-on: violations
+          docker-cli-args: >-
+            -e ORT_ARTIFACTORY_TOKEN=${{ secrets.ORT_ARTIFACTORY_TOKEN }}
           run: >
             cache-dependencies,
             cache-scan-results,

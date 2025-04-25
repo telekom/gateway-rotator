@@ -30,11 +30,16 @@ ort:
           localFileStorage:
             directory: /home/ort/.ort/scanner/results
             compression: false
-      # Read license information from https://clearlydefined.io
-      clearlyDefined:
-        serverUrl: 'https://api.clearlydefined.io'
-    storageReaders: ["local", "clearlyDefined"]
-    storageWriters: ["local"]
+      # Read/write results to OpenSource@DTIT ORT cache on artifactory
+      artifactory:
+        backend:
+          httpFileStorage:
+            url: "https://artifactory.devops.telekom.de/artifactory/open-source-dtit-ort-generic/ort/scan-results"
+            headers:
+              Authorization: "Bearer ${ORT_ARTIFACTORY_TOKEN}"
+      # ClearlyDefined is disabled because it only produces 404s...
+    storageReaders: ["local", "artifactory"]
+    storageWriters: ["artifactory", "local"]
     skipExcluded: true
   advisor:
     skipExcluded: true
