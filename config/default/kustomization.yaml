@@ -2,8 +2,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Adds namespace to all resources.
-namespace: k8s-tls-rotator-system
+namespace: k8s-tls-rotator
 # Prefix to prepend to all resources
 namePrefix: k8s-tls-rotator-
 
@@ -16,9 +19,8 @@ labels:
 resources:
 - manager.yaml
 - metrics_service.yaml
+- servicemonitor.yaml
 - ../rbac
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
 images:
 - name: k8s-tls-rotator
   newName: k8s-tls-rotator

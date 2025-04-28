@@ -16,7 +16,7 @@ import (
 )
 
 // namespace where the project is deployed in.
-const namespace = "k8s-tls-rotator-system"
+const namespace = "k8s-tls-rotator"
 
 // serviceAccountName created for the project.
 const serviceAccountName = "k8s-tls-rotator-controller-manager"

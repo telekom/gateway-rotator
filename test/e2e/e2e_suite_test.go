@@ -43,4 +43,8 @@ var _ = BeforeSuite(func() {
 	By("loading the manager(Operator) image on Kind")
 	err = utils.LoadImageToKindClusterWithName(projectImage, clusterName)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
+
+	By("installing Prometheus")
+	err = utils.InstallPrometheusOperator()
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to install Prometheus")
 })
