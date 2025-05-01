@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-module gw.mdw.telekom.de/rotator
+module gw.ei.telekom.de/rotator
 
 go 1.23.8
 

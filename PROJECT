@@ -6,11 +6,11 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: rotator.gw.mdw.telekom.de
+domain: rotator.gw.ei.telekom.de
 layout:
 - go.kubebuilder.io/v4
 projectName: k8s-tls-rotator
-repo: gw.mdw.telekom.de/rotator
+repo: gw.ei.telekom.de/rotator
 resources:
 - controller: true
   core: true

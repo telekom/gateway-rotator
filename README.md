@@ -40,9 +40,9 @@ This operator allows us to do this, while still enjoying the auto renewal capabi
 ### Key rotation Process
 
 The operator is configured to reconcile a set of source secrets with the following annotations.
-- `rotator.gateway.mdw.telekom.de/source-secret`: A boolean value indicating whether this secret is
+- `rotator.gw.ei.telekom.de/source-secret`: A boolean value indicating whether this secret is
 a source secret
-- `rotator.gateway.mdw.telekom.de/destination-secret-name`: The name of the target secret to be
+- `rotator.gw.ei.telekom.de/destination-secret-name`: The name of the target secret to be
 created
 
 It will then create a target secret with the following structure:
@@ -113,8 +113,8 @@ kind: Secret
 metadata:
   name: source
   annotations:
-    rotator.gateway.mdw.telekom.de/destination-secret-name: target
-    rotator.gateway.mdw.telekom.de/source-secret: "true"
+    rotator.gw.ei.telekom.de/destination-secret-name: target
+    rotator.gw.ei.telekom.de/source-secret: "true"
 type: kubernetes.io/tls
 stringData:
   tls.key: test-key

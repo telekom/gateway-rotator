@@ -57,7 +57,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	target := &corev1.Secret{}
 	targetNamespacedName := types.NamespacedName{
 		Namespace: source.Namespace,
-		Name:      source.Annotations["rotator.gateway.mdw.telekom.de/destination-secret-name"],
+		Name:      source.Annotations["rotator.gw.ei.telekom.de/destination-secret-name"],
 	}
 	log = log.WithValues("target", targetNamespacedName)
 	err := r.Get(ctx, targetNamespacedName, target)
@@ -150,7 +150,7 @@ func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func initializeLocalTarget(source *corev1.Secret, kid uuid.UUID) corev1.Secret {
 	return corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      source.Annotations["rotator.gateway.mdw.telekom.de/destination-secret-name"],
+			Name:      source.Annotations["rotator.gw.ei.telekom.de/destination-secret-name"],
 			Namespace: source.Namespace,
 		},
 		Type: corev1.SecretTypeTLS,

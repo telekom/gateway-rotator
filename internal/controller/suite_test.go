@@ -12,7 +12,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gw.mdw.telekom.de/rotator/internal/controller"
+	"gw.ei.telekom.de/rotator/internal/controller"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -83,9 +83,9 @@ var _ = BeforeSuite(func() {
 	err = (&controller.SecretReconciler{
 		Client:               k8sManager.GetClient(),
 		Scheme:               k8sManager.GetScheme(),
-		SourceAnnotation:     "rotator.gateway.mdw.telekom.de/source",
-		TargetNameAnnotation: "rotator.gateway.mdw.telekom.de/destination-secret-name",
-		Finalizer:            "rotator.gateway.mdw.telekom.de/finalizer",
+		SourceAnnotation:     "rotator.gw.ei.telekom.de/source",
+		TargetNameAnnotation: "rotator.gw.ei.telekom.de/destination-secret-name",
+		Finalizer:            "rotator.gw.ei.telekom.de/finalizer",
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

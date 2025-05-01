@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gw.mdw.telekom.de/rotator/internal/controller"
+	"gw.ei.telekom.de/rotator/internal/controller"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,8 +53,8 @@ var _ = Describe("Secret Controller", Serial, func() {
 			source = &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"rotator.gateway.mdw.telekom.de/source":                  "true",
-						"rotator.gateway.mdw.telekom.de/destination-secret-name": "target",
+						"rotator.gw.ei.telekom.de/source":                  "true",
+						"rotator.gw.ei.telekom.de/destination-secret-name": "target",
 					},
 					Name:      "source",
 					Namespace: namespace,
@@ -302,8 +302,8 @@ var _ = Describe("Secret Controller", Serial, func() {
 			source = &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"rotator.gateway.mdw.telekom.de/source":                  "true",
-						"rotator.gateway.mdw.telekom.de/destination-secret-name": "target",
+						"rotator.gw.ei.telekom.de/source":                  "true",
+						"rotator.gw.ei.telekom.de/destination-secret-name": "target",
 					},
 					Name:      "source",
 					Namespace: namespace,
@@ -333,8 +333,8 @@ var _ = Describe("Secret Controller", Serial, func() {
 			source = &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"rotator.gateway.mdw.telekom.de/source":                  "true",
-						"rotator.gateway.mdw.telekom.de/destination-secret-name": "target",
+						"rotator.gw.ei.telekom.de/source":                  "true",
+						"rotator.gw.ei.telekom.de/destination-secret-name": "target",
 					},
 					Name:      "source",
 					Namespace: namespace,
@@ -370,9 +370,9 @@ var _ = Describe("Secret Controller", Serial, func() {
 			reconciler = controller.SecretReconciler{
 				Client:               erroringClient,
 				Scheme:               k8sClient.Scheme(),
-				SourceAnnotation:     "rotator.gateway.mdw.telekom.de/source",
-				TargetNameAnnotation: "rotator.gateway.mdw.telekom.de/destination-secret-name",
-				Finalizer:            "rotator.gateway.mdw.telekom.de/finalizer",
+				SourceAnnotation:     "rotator.gw.ei.telekom.de/source",
+				TargetNameAnnotation: "rotator.gw.ei.telekom.de/destination-secret-name",
+				Finalizer:            "rotator.gw.ei.telekom.de/finalizer",
 			}
 		})
 

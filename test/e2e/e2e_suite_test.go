@@ -12,7 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"gw.mdw.telekom.de/rotator/test/utils"
+	"gw.ei.telekom.de/rotator/test/utils"
 )
 
 var (
