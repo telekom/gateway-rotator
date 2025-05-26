@@ -15,12 +15,16 @@ labels:
 - pairs:
     component: stargate
     project: narvi
+    app.kubernetes.io/name: k8s-tls-rotator
+    app.kubernetes.io/managed-by: kustomize
 
 resources:
 - manager.yaml
 - metrics_service.yaml
 - servicemonitor.yaml
 - ../rbac
+
 images:
 - name: k8s-tls-rotator
   newName: k8s-tls-rotator
+  newTag: latest
