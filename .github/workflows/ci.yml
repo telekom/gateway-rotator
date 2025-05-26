@@ -14,9 +14,15 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "The next release version"
+        type: string
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -304,10 +310,20 @@ jobs:
       - name: Determine tag
         id: tag
         run: |
-          if [[ "${GITHUB_REF_POINT_SLUG}" == "main" ]]; then
-            export TAG="latest"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "This workflow was triggered by workflow_dispatch."
+            export TAG=${{ github.event.inputs.release_version }}
           else
-            export TAG="${GITHUB_REF_POINT_SLUG}-${GITHUB_RUN_ID}"
+            if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+              echo "This workflow was triggered by a tag push ${GITHUB_REF}"
+              export TAG=$(echo ${GITHUB_REF} | sed 's|^refs/tags/v||')
+            else
+              if [[ "${GITHUB_REF_POINT_SLUG}" == "main" ]]; then
+                export TAG="latest"
+              else
+                export TAG=${GITHUB_REF_POINT_SLUG}-${GITHUB_RUN_ID}
+              fi
+            fi
           fi
           echo "Image tag will be: ${TAG}"
           echo "image-tag=${TAG}" >> "${GITHUB_OUTPUT}"
@@ -327,11 +343,12 @@ jobs:
         env:
           DOCKER_BUILD_SUMMARY: false
         with:
-          build-args: GO_VERSION=${{ needs.build-go.outputs.go-version }}
-          push: true
           tags: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:${{ steps.tag.outputs.image-tag }}
           cache-from: type=registry,ref=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:latest
           cache-to: type=inline
+          build-args: GO_VERSION=${{ needs.build-go.outputs.go-version }}
+          push: true
+          platforms: linux/amd64,linux/arm64
 
   scan-image:
     name: Scan image
