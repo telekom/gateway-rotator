@@ -6,11 +6,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  labels:
-    control-plane: controller-manager
-    app.kubernetes.io/name: k8s-tls-rotator
   name: controller-manager-metrics-monitor
-  namespace: system
 spec:
   endpoints:
     - path: /metrics

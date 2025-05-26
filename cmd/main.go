@@ -9,6 +9,8 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -39,6 +41,8 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var clusterScoped bool
+	var namespacesCli string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(
 		&metricsAddr,
@@ -96,6 +100,18 @@ func main() {
 	)
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(
+		&clusterScoped,
+		"cluster-scoped",
+		true,
+		"define operator mode as cluster-scoped (default) or namespace-scoped")
+	flag.StringVar(
+		&namespacesCli,
+		"namespaces",
+		"",
+		"Comma separated list of namespaces to watch. If not set, all namespaces will be watched.",
+	)
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -107,6 +123,53 @@ func main() {
 	// +kubebuilder:scaffold:scheme
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// alternatively read from env var ROTATOR_CLUSTERSCOPED and overwrite clusterScoped var and env var takes precedence to cli flag
+	if val, ok := os.LookupEnv("ROTATOR_CLUSTERSCOPED"); ok {
+		if val == "true" {
+			clusterScoped = true
+		} else if val == "false" {
+			clusterScoped = false
+		} else {
+			setupLog.Error(nil, "invalid value for ROTATOR_CLUSTERSCOPED, must be true or false")
+			os.Exit(1)
+		}
+	}
+
+	// log the value of clusterScoped
+	setupLog.Info("rotator is set to mode", "clusterScoped", clusterScoped)
+
+	// parse the namespaces string into a slice
+	var namespaces []string
+	if namespacesCli != "" {
+		namespaces = strings.Split(namespacesCli, ",")
+	}
+
+	// also here we check if the env var ROTATOR_NAMESPACES is set and overwrite the flag value
+	if namespacesEnv, ok := os.LookupEnv("ROTATOR_NAMESPACES"); ok {
+		namespaces = strings.Split(namespacesEnv, ",")
+	}
+
+	// based on namespaces slice, we create a DefaultNamespaces map[string]Config object
+	// if the slice is empty, we set the DefaultNamespaces to nil
+	// if the slice is not empty, we set the DefaultNamespaces to a map with the namespaces
+	// and a Config object with the namespaces
+	namespacesMap := make(map[string]cache.Config)
+	if len(namespaces) > 0 && namespaces[0] != "" {
+		setupLog.Info("listening to namespaces from cli param or environment variable", "namespaces", namespaces)
+
+		for _, ns := range namespaces {
+			namespacesMap[ns] = cache.Config{}
+		}
+	} else {
+		setupLog.Info("listening to all namespaces, no namespaces provided in cli param or environment variable")
+		namespacesMap = nil
+	}
+
+	if !clusterScoped && namespacesMap == nil {
+		setupLog.Error(nil, "rotator is set to namespace-scoped mode, but no namespaces are provided")
+		os.Exit(1)
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -215,7 +278,10 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "62f83323.rotator.gw.ei.telekom.de",
+		Cache: cache.Options{
+			DefaultNamespaces: namespacesMap,
+		},
+		LeaderElectionID: "62f83323.rotator.gw.ei.telekom.de",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

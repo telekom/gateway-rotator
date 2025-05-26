@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2025 Deutsche Telekom IT GmbH
+#
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Adds namespace to all resources.
+namespace: k8s-tls-rotator
+
+# Labels to add to all resources and selectors.
+labels:
+  - pairs:
+      component: stargate
+      project: narvi
+      app.kubernetes.io/name: k8s-tls-rotator
+      app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - ../../default
+  - role.yaml
+  - role_binding.yaml
+
+patches:
+  - path: role.patch.yaml
+    target:
+      kind: ClusterRole
+      name: manager-role
+  - path: role_binding.patch.yaml
+    target:
+      kind: ClusterRoleBinding
+      name: manager-rolebinding
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ROTATOR_CLUSTERSCOPED
+          value: 'false'
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ROTATOR_NAMESPACES
+          value: willbereplacebelow
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+
+replacements:
+  - source:
+      kind: Deployment
+      name: controller-manager
+      fieldPath: metadata.namespace
+    targets:
+      - select:
+          name: controller-manager
+          kind: Deployment
+        fieldPaths:
+          - spec.template.spec.containers.[name=manager].env.[name=ROTATOR_NAMESPACE].value

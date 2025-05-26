@@ -2,23 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    control-plane: controller-manager
-    app.kubernetes.io/name: k8s-tls-rotator
-  name: system
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: k8s-tls-rotator
-    app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
     matchLabels:
@@ -49,6 +38,7 @@ spec:
         imagePullPolicy: IfNotPresent
         name: manager
         ports: []
+        env: []
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
