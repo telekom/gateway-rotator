@@ -7,10 +7,11 @@ package main //nolint:cyclop // high complexity because of setup
 import (
 	"crypto/tls"
 	"flag"
-	"github.com/go-logr/logr"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-logr/logr"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -32,10 +33,8 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-// constants for the controller managers capable environment variables
+// constants for the controller managers capable environment variables.
 const (
-	// EnvVarClusterScoped defines the environment variable to set the controller manager mode to cluster-scoped.
-	EnvVarClusterScoped = "ROTATOR_CLUSTERSCOPED"
 	// EnvVarNamespaces defines the environment variable to set the namespaces to watch.
 	EnvVarNamespaces = "ROTATOR_NAMESPACES"
 )
@@ -50,7 +49,6 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var clusterScoped bool
 	var namespacesCli string
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(
@@ -109,11 +107,6 @@ func main() {
 	)
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(
-		&clusterScoped,
-		"cluster-scoped",
-		true,
-		"define operator mode as cluster-scoped (default) or namespace-scoped")
 	flag.StringVar(
 		&namespacesCli,
 		"namespaces",
@@ -133,7 +126,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	namespacesMap := applyNamespacesFromCliOrEnv(namespacesCli, setupLog, clusterScoped)
+	namespacesMap := applyNamespacesFromCliOrEnv(namespacesCli, setupLog)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -307,9 +300,7 @@ func main() {
 	}
 }
 
-func applyNamespacesFromCliOrEnv(namespacesCli string, setupLog logr.Logger, clusterScoped bool) map[string]cache.Config {
-	clusterScoped = applyClusterScopedFromEnv(clusterScoped, setupLog)
-
+func applyNamespacesFromCliOrEnv(namespacesCli string, setupLog logr.Logger) map[string]cache.Config {
 	// parse the namespaces string into a slice
 	var namespaces []string
 	if namespacesCli != "" {
@@ -337,27 +328,5 @@ func applyNamespacesFromCliOrEnv(namespacesCli string, setupLog logr.Logger, clu
 		namespacesMap = nil
 	}
 
-	if !clusterScoped && namespacesMap == nil {
-		setupLog.Error(nil, "rotator is set to namespace-scoped mode, but no namespaces are provided")
-		os.Exit(1)
-	}
-
 	return namespacesMap
-}
-
-func applyClusterScopedFromEnv(clusterScoped bool, setupLog logr.Logger) bool {
-	if val, ok := os.LookupEnv(EnvVarClusterScoped); ok {
-		switch val {
-		case "true":
-			clusterScoped = true
-		case "false":
-			clusterScoped = false
-		default:
-			setupLog.Error(nil, "invalid value for "+EnvVarClusterScoped+", must be true or false")
-			os.Exit(1)
-		}
-	}
-
-	setupLog.Info("rotator is set to mode", "clusterScoped", clusterScoped)
-	return clusterScoped
 }

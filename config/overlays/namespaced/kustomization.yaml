@@ -34,11 +34,6 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: ROTATOR_CLUSTERSCOPED
-          value: 'false'
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
           name: ROTATOR_NAMESPACES
           value: willbereplacebelow
     target:
