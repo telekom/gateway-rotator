@@ -7,9 +7,9 @@ package main //nolint:cyclop // high complexity because of setup
 import (
 	"crypto/tls"
 	"flag"
+	"github.com/go-logr/logr"
 	"os"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -20,6 +20,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -29,6 +30,14 @@ import (
 
 	"gw.ei.telekom.de/rotator/internal/controller"
 	// +kubebuilder:scaffold:imports
+)
+
+// constants for the controller managers capable environment variables
+const (
+	// EnvVarClusterScoped defines the environment variable to set the controller manager mode to cluster-scoped.
+	EnvVarClusterScoped = "ROTATOR_CLUSTERSCOPED"
+	// EnvVarNamespaces defines the environment variable to set the namespaces to watch.
+	EnvVarNamespaces = "ROTATOR_NAMESPACES"
 )
 
 //nolint:funlen
@@ -124,52 +133,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// alternatively read from env var ROTATOR_CLUSTERSCOPED and overwrite clusterScoped var and env var takes precedence to cli flag
-	if val, ok := os.LookupEnv("ROTATOR_CLUSTERSCOPED"); ok {
-		if val == "true" {
-			clusterScoped = true
-		} else if val == "false" {
-			clusterScoped = false
-		} else {
-			setupLog.Error(nil, "invalid value for ROTATOR_CLUSTERSCOPED, must be true or false")
-			os.Exit(1)
-		}
-	}
-
-	// log the value of clusterScoped
-	setupLog.Info("rotator is set to mode", "clusterScoped", clusterScoped)
-
-	// parse the namespaces string into a slice
-	var namespaces []string
-	if namespacesCli != "" {
-		namespaces = strings.Split(namespacesCli, ",")
-	}
-
-	// also here we check if the env var ROTATOR_NAMESPACES is set and overwrite the flag value
-	if namespacesEnv, ok := os.LookupEnv("ROTATOR_NAMESPACES"); ok {
-		namespaces = strings.Split(namespacesEnv, ",")
-	}
-
-	// based on namespaces slice, we create a DefaultNamespaces map[string]Config object
-	// if the slice is empty, we set the DefaultNamespaces to nil
-	// if the slice is not empty, we set the DefaultNamespaces to a map with the namespaces
-	// and a Config object with the namespaces
-	namespacesMap := make(map[string]cache.Config)
-	if len(namespaces) > 0 && namespaces[0] != "" {
-		setupLog.Info("listening to namespaces from cli param or environment variable", "namespaces", namespaces)
-
-		for _, ns := range namespaces {
-			namespacesMap[ns] = cache.Config{}
-		}
-	} else {
-		setupLog.Info("listening to all namespaces, no namespaces provided in cli param or environment variable")
-		namespacesMap = nil
-	}
-
-	if !clusterScoped && namespacesMap == nil {
-		setupLog.Error(nil, "rotator is set to namespace-scoped mode, but no namespaces are provided")
-		os.Exit(1)
-	}
+	namespacesMap := applyNamespacesFromCliOrEnv(namespacesCli, setupLog, clusterScoped)
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -341,4 +305,59 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func applyNamespacesFromCliOrEnv(namespacesCli string, setupLog logr.Logger, clusterScoped bool) map[string]cache.Config {
+	clusterScoped = applyClusterScopedFromEnv(clusterScoped, setupLog)
+
+	// parse the namespaces string into a slice
+	var namespaces []string
+	if namespacesCli != "" {
+		namespaces = strings.Split(namespacesCli, ",")
+	}
+
+	// also here we check if the env var ROTATOR_NAMESPACES is set and overwrite the flag value
+	if namespacesEnv, ok := os.LookupEnv(EnvVarNamespaces); ok {
+		namespaces = strings.Split(namespacesEnv, ",")
+	}
+
+	// based on namespaces slice, we create a DefaultNamespaces map[string]Config object
+	// if the slice is empty, we set the DefaultNamespaces to nil
+	// if the slice is not empty, we set the DefaultNamespaces to a map with the namespaces
+	// and a Config object with the namespaces
+	namespacesMap := make(map[string]cache.Config)
+	if len(namespaces) > 0 && namespaces[0] != "" {
+		setupLog.Info("listening to namespaces from cli param or environment variable", "namespaces", namespaces)
+
+		for _, ns := range namespaces {
+			namespacesMap[ns] = cache.Config{}
+		}
+	} else {
+		setupLog.Info("listening to all namespaces, no namespaces provided in cli param or environment variable")
+		namespacesMap = nil
+	}
+
+	if !clusterScoped && namespacesMap == nil {
+		setupLog.Error(nil, "rotator is set to namespace-scoped mode, but no namespaces are provided")
+		os.Exit(1)
+	}
+
+	return namespacesMap
+}
+
+func applyClusterScopedFromEnv(clusterScoped bool, setupLog logr.Logger) bool {
+	if val, ok := os.LookupEnv(EnvVarClusterScoped); ok {
+		switch val {
+		case "true":
+			clusterScoped = true
+		case "false":
+			clusterScoped = false
+		default:
+			setupLog.Error(nil, "invalid value for "+EnvVarClusterScoped+", must be true or false")
+			os.Exit(1)
+		}
+	}
+
+	setupLog.Info("rotator is set to mode", "clusterScoped", clusterScoped)
+	return clusterScoped
 }
