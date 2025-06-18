@@ -4,7 +4,7 @@
 
 module gw.ei.telekom.de/rotator
 
-go 1.23.8
+go 1.23.10
 
 require (
 	github.com/go-logr/logr v1.4.2
