@@ -235,10 +235,10 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "62f83323.rotator.gw.ei.telekom.de",
 		Cache: cache.Options{
 			DefaultNamespaces: namespacesMap,
 		},
-		LeaderElectionID: "62f83323.rotator.gw.ei.telekom.de",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -301,21 +301,21 @@ func main() {
 }
 
 func applyNamespacesFromCliOrEnv(namespacesCli string, setupLog logr.Logger) map[string]cache.Config {
-	// parse the namespaces string into a slice
+	// Parse the namespaces string into a slice
 	var namespaces []string
 	if namespacesCli != "" {
 		namespaces = strings.Split(namespacesCli, ",")
 	}
 
-	// also here we check if the env var ROTATOR_NAMESPACES is set and overwrite the flag value
+	// We also check if the env var ROTATOR_NAMESPACES is set and overwrite the flag value
 	if namespacesEnv, ok := os.LookupEnv(EnvVarNamespaces); ok {
 		namespaces = strings.Split(namespacesEnv, ",")
 	}
 
-	// based on namespaces slice, we create a DefaultNamespaces map[string]Config object
-	// if the slice is empty, we set the DefaultNamespaces to nil
-	// if the slice is not empty, we set the DefaultNamespaces to a map with the namespaces
-	// and a Config object with the namespaces
+	// Based on namespaces slice, we create a DefaultNamespaces map[string]Config object.
+	// If the slice is empty, we set the DefaultNamespaces to nil.
+	// If the slice is not empty, we set the DefaultNamespaces to a map with the namespaces
+	// and a Config object with the namespaces.
 	namespacesMap := make(map[string]cache.Config)
 	if len(namespaces) > 0 && namespaces[0] != "" {
 		setupLog.Info("listening to namespaces from cli param or environment variable", "namespaces", namespaces)
