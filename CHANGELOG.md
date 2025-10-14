@@ -1,12 +1,15 @@
-# 1.0.0 (2025-05-28)
+# Changelog
 
+> [!WARNING]
+> This changelog is an archive. Future changes are documented in the projects [GitHub releases](https://github.com/telekom/gateway-rotator/releases).
+
+# 1.0.0 (2025-05-28)
 
 ### Bug Fixes
 
 * add check for tls fields in source secret ([f6d2c91](https://github.com/telekom/gateway-rotator/commit/f6d2c91d6fb6d0620ef5f3c6780bdcd5bd74cdaa))
 * add predicate for target name annotation ([833f52b](https://github.com/telekom/gateway-rotator/commit/833f52b51b155699048ce6ffe75de9d9f816da56))
 * clusterwide overlay deploys namespace resource ([c00945d](https://github.com/telekom/gateway-rotator/commit/c00945d64e1475fefb1914d216d4c259e9779618))
-
 
 ### Features
 
