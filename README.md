@@ -37,15 +37,14 @@ This operator allows us to do this, while still enjoying the auto renewal capabi
 
 ![Architecture Diagram](./docs/architecture.svg)
 
-### Key rotation Process
+### Key Rotation Process
 
-The operator is configured to reconcile a set of source secrets with the following annotations.
-- `rotator.gw.ei.telekom.de/source-secret`: A boolean value indicating whether this secret is
-a source secret
-- `rotator.gw.ei.telekom.de/destination-secret-name`: The name of the target secret to be
-created
+The operator watches source secrets with the following annotations:
 
-It will then create a target secret with the following structure:
+- `rotator.gw.ei.telekom.de/source-secret: "true"` - Marks the secret as a source
+- `rotator.gw.ei.telekom.de/destination-secret-name: <name>` - Specifies the target secret name
+
+When a source secret is detected, the operator creates a target secret with the following structure:
 
 ```yaml
 apiVersion: v1
@@ -65,65 +64,83 @@ data:
   next-tls.kid: ""
 ```
 
-`prev-tls.crt` and `prev-tls.key` now contain the key and cert from the source secret. The
-`prev-tls.kid` is a UUID based on a hash of the certificate and can be used as a KID in the JWK set.
-The other two sets of keys are currently empty and will subsequently be filled with the next
-rotation.
+**Initial creation:** The source certificate and key are placed in `next-tls.*` fields. The `next-tls.kid` contains a UUID generated from the certificate hash, which can be used as a Key ID in JWK sets. The `tls.*` and `prev-tls.*` fields are initially empty.
 
-Once the source secret is updated with new values (e.g. by cert-manager), the operator will rotate
-the values:
-1. `tls.*` will be written to `next-tls.*`
-2. `prev-tls.*` will be written to `tls.*`
-3. The values from source will be written to `prev-tls.*`
+**Subsequent rotations:** When the source secret is updated (e.g., by cert-manager renewal), the operator performs a three-way rotation:
 
-This happens on every change of the source.
+1. `tls.*` → `prev-tls.*` (current becomes previous)
+2. `next-tls.*` → `tls.*` (next becomes current)
+3. source → `next-tls.*` (new certificate becomes next)
 
-If a different source secret is created with the same target annotation, the operator will also
-trigger a rotation. If the values in the source are equal to the values in `prev-tls.*` the rotation
-will be skipped.
+**Important behaviors:**
+- Rotation is triggered on every source secret change
+- Rotation is skipped if the source certificate matches `next-tls.crt` (idempotency)
+- Multiple source secrets can target the same destination (each change in one of the secrets will trigger a rotation),
+  however this is discouraged because of complexity
 
-[The secret controllers integration tests](./internal_controller/secret_controller_test.go) serve as
-a detailed specification of the controller's behavior.
+The [integration tests](./internal/controller/secret_controller_test.go) serve as a detailed specification of the controller's behavior.
 
-### Usage of certs/keys
+### Usage by Authorization Servers
 
-The authorization server should ***always*** expose all three keys in the JWK set.
+Authorization servers (in the case of Stargate, the [issuer-service](https://github.com/telekom/gateway-issuer-service-go)) consuming the target secret should follow these rules:
 
-The values in `tls.*` should ***always*** be used for signing JWTs. This ensures that
-- resource servers are able to verify tokens signed with the previous key
-- the previously active key stays in the JWK set, ensuring verification is possible even with
-  mounting delays.
+- **Always expose all three keys** (`prev-tls.*`, `tls.*`, `next-tls.*`) in the JWK set
+- **Always use `tls.*` for signing** new JWTs
+
+This approach ensures:
+- Resource servers can verify tokens signed with the previous key
+- The next key is pre-distributed before it becomes active
+- Rotation works smoothly despite eventual consistency in volume mount propagation
 
 ## Development
 
-Local development is easiest done using a local [Kind](https://kind.sigs.k8s.io/) cluster.
+### Local Development Setup
 
-You can build and deploy changes to the operator in one step using the following command:
+Local development is easiest using a [Kind](https://kind.sigs.k8s.io/) cluster. Make sure your `kubectl` context points to your Kind cluster:
+
 ```bash
-make docker-build IMG=rotator && kind load docker-image rotator && make deploy IMG=rotator`
+kubectl config use-context kind-<your-cluster-name>
 ```
-This will build a docker image locally, load it into kind and deploy the operator into the `tls-rotator` namespace.
-Make sure you have set your `kubectl` context to use your kind cluster using `kubectl config use context kind-${your-cluster-name}`.
 
-You can then create a test secret using the following command:
+### Quick Build and Deploy
+
+Build, load, and deploy the operator in one command:
+
 ```bash
-cat <<EOF > secret.yaml
+make docker-build IMG=rotator && kind load docker-image rotator && make deploy IMG=rotator
+```
+
+This builds a Docker image locally, loads it into Kind, and deploys the operator.
+
+### Verify the Operator
+
+Create a test source secret to verify the operator is working:
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
   name: source
   annotations:
-    rotator.gw.ei.telekom.de/destination-secret-name: target
     rotator.gw.ei.telekom.de/source-secret: "true"
+    rotator.gw.ei.telekom.de/destination-secret-name: target
 type: kubernetes.io/tls
 stringData:
   tls.key: test-key
   tls.crt: test-crt
 EOF
-
-kubectl apply -f secret.yaml
 ```
-and watch the operator reconcile it.
+
+Watch the operator logs and verify it creates the target secret:
+
+```bash
+# Watch operator logs
+kubectl logs -n tls-rotator-system -l control-plane=controller-manager -f
+
+# Verify target secret was created
+kubectl get secret target -o yaml
+```
 
 ## Deployment
 
@@ -164,7 +181,7 @@ kubectl apply -k config/overlays/namespaced
 This creates namespace-scoped roles and bindings instead of cluster-wide permissions and is useful
 for deploying to shared clusters. It will automatically only watch the namespace it's deployed to.
 
-### Configuring Namespace Watching
+### Configuring Custom Namespace Watching
 
 If required, the operator supports configuring multiple namespaces:
 
@@ -246,37 +263,64 @@ stringData:
 
 ## Testing
 
-There are two types of tests in this project
+The project includes two types of tests:
 
-### Unit/Integration tests
+### Unit/Integration Tests
 
-You can find these next to the controller in [`internal/controller`](./internal/controller).
-On first run you need to set up envtest on your local machine to be able to construct a test environment.
+These tests use [envtest](https://book.kubebuilder.io/reference/envtest.html) to run against a real Kubernetes API server (without requiring a full cluster). They are located in [`internal/controller`](./internal/controller).
+
+**First-time setup:**
 ```bash
 make setup-envtest
 ```
 
-You can then run the tests using either `make test`, or the `ginkgo` binary from the  `internal/controller` directory.
+**Run all tests:**
+```bash
+make test
+```
 
-### E2E tests
+**Run tests with coverage (CI mode):**
+```bash
+make test-ci
+```
 
-These are tests generated by kubebuilder to test the operator in a real cluster.
-They test if the operator is able to deploy using the [manifests](./config) and
-the basic availability of the manager API and the metrics endpoint.
+**Run specific tests with Ginkgo:**
+```bash
+cd internal/controller
+go run github.com/onsi/ginkgo/v2/ginkgo -v --focus="should create target secret"
+```
 
-In the future we could add additional functionality to these tests.
+### E2E Tests
 
-You can run the tests using the following command:
+End-to-end tests verify the operator can be deployed in a real cluster and that its health endpoints are accessible. These tests require a running Kind cluster.
+
+**Prerequisites:**
+```bash
+# Ensure Kind cluster is running
+kind get clusters | grep -q 'kind' || kind create cluster
+```
+
+**Run E2E tests:**
 ```bash
 make test-e2e
 ```
-The tests are expected to run against the kubectl context called `kind-kind`.
-You can change this by changing the variable `clusterName` in the e2e suite.
 
-## Additional notes
+**Note:** Tests expect the kubectl context `kind-kind`. To use a different cluster, modify the `clusterName` variable in [`test/e2e/e2e_suite_test.go`](./test/e2e/e2e_suite_test.go).
 
-The code generated by kubebuilder required for setting up CRDs or webhooks
-has been deleted in the manifests, Makefile, tests, etc., because it is not needed in the current scope of the operator.
-If you want to add any of these things in the future, we suggest either checking out an early commit of this project
-or scaffolding a new project and adding them back.
+The E2E tests currently don't verfiy any of the actual functionality.
+This is covered by the unit and integration tests.
+
+## Additional Notes
+
+### Kubebuilder Scaffold Removal
+
+This operator was initially scaffolded with [Kubebuilder](https://book.kubebuilder.io/) but does not require CRDs or webhooks. The generated code for these features has been removed from the manifests, Makefile, and tests to keep the project lean.
+
+If you need to add CRDs or webhooks in the future, either check out an early commit of this project or scaffold a new Kubebuilder project and merge the code.
+
+## License
+
+This project is licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSES/Apache-2.0.txt) file for details.
+
+The project is [REUSE](https://reuse.software/) compliant, meaning all files have clear copyright and licensing information. REUSE compliance is verified through CI and configured in [`REUSE.toml`](./REUSE.toml).
 
