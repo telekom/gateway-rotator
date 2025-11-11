@@ -125,6 +125,125 @@ kubectl apply -f secret.yaml
 ```
 and watch the operator reconcile it.
 
+## Deployment
+
+**Note:** Unlike other components in the o28m ecosystem which are deployed via Helm charts, this operator uses [Kustomize](https://kustomize.io/) for deployment configuration. Kustomize is the standard tool for Kubernetes operators built with Kubebuilder.
+
+### Building and Pushing the Image
+
+First, build and push your operator image to a container registry:
+
+```bash
+# Build the image
+make docker-build IMG=<your-registry>/k8s-tls-rotator:tag
+
+# Push to registry
+make docker-push IMG=<your-registry>/k8s-tls-rotator:tag
+```
+
+### Deployment Options
+
+The operator can be deployed in two modes:
+
+#### Cluster-wide Deployment
+
+Deploy the operator with cluster-wide permissions to watch secrets across all namespaces:
+
+```bash
+kubectl apply -k config/overlays/clusterwide
+```
+
+#### Namespace-scoped Deployment
+
+For a more restricted deployment that only watches specific namespaces, use the namespaced overlay:
+
+```bash
+kubectl apply -k config/overlays/namespaced
+```
+
+This creates namespace-scoped roles and bindings instead of cluster-wide permissions and is useful
+for deploying to shared clusters. It will automatically only watch the namespace it's deployed to.
+
+### Configuring Namespace Watching
+
+If required, the operator supports configuring multiple namespaces:
+
+**Via command-line flag:**
+```bash
+# Edit the deployment to add --namespaces flag
+--namespaces=namespace1,namespace2
+```
+
+**Via environment variable:**
+```yaml
+env:
+  - name: ROTATOR_NAMESPACES
+    value: "namespace1,namespace2"
+```
+
+This is not possible using the included kustomize overlays, you would have to define your own.
+If neither is set, the operator watches all namespaces (used by the  cluster-wide overlay).
+
+### Verifying Deployment
+
+After deployment, verify the operator is running:
+
+```bash
+# Check operator pod
+kubectl get pods -n '<your-namespace>'
+
+# Check operator logs
+kubectl logs -n '<your-namespace>' -l control-plane=controller-manager
+```
+
+### Creating Source Secrets
+
+**Production Usage:** In a real deployment, source secrets should be created and managed by [cert-manager](https://cert-manager.io/). Configure your Certificate resource to include the required annotations:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: stargate-jwk-cert
+  namespace: default
+spec:
+  secretName: stargate-jwk-source
+  secretTemplate:
+    annotations:
+      rotator.gw.ei.telekom.de/source-secret: "true"
+      rotator.gw.ei.telekom.de/destination-secret-name: stargate-jwk-dest
+  issuerRef:
+    name: your-issuer
+    kind: Issuer
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS8
+    rotationPolicy: Always
+    size: 2048
+  duration: 672h  # 4 weeks
+  renewBefore: 504h  # 3 weeks
+```
+
+
+Cert-manager will create and automatically renew the source secret with the specified annotations,
+and the rotator operator will maintain the target secret with the three-key rotation pattern.
+
+**Testing:** For testing purposes, you can create a dummy secret manually:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-tls-source
+  annotations:
+    rotator.gw.ei.telekom.de/source-secret: "true"
+    rotator.gw.ei.telekom.de/destination-secret-name: my-rotated-keys
+type: kubernetes.io/tls
+stringData:
+  tls.crt: test-cert-data
+  tls.key: test-key-data
+```
+
 ## Testing
 
 There are two types of tests in this project
