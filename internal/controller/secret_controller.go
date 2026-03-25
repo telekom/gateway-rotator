@@ -48,7 +48,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if source.Data["tls.crt"] == nil ||
 		len(source.Data["tls.crt"]) == 0 ||
 		source.Data["tls.key"] == nil ||
-		len(source.Data["tls.crt"]) == 0 {
+		len(source.Data["tls.key"]) == 0 {
 		log.Error(nil, "Source secret does not contain tls.crt and tls.key")
 		return ctrl.Result{}, nil
 	}
