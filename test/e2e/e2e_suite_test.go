@@ -5,6 +5,7 @@
 package e2e_test
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"testing"
@@ -34,17 +35,17 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "e2e suite")
 }
 
-var _ = BeforeSuite(func() {
+var _ = BeforeSuite(func(ctx context.Context) {
 	By("building the manager(Operator) image")
-	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
+	cmd := exec.CommandContext(ctx, "make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
 	_, err := utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
 
 	By("loading the manager(Operator) image on Kind")
-	err = utils.LoadImageToKindClusterWithName(projectImage, clusterName)
+	err = utils.LoadImageToKindClusterWithName(ctx, projectImage, clusterName)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to load the manager(Operator) image into Kind")
 
 	By("installing Prometheus")
-	err = utils.InstallPrometheusOperator()
+	err = utils.InstallPrometheusOperator(ctx)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to install Prometheus")
 })
