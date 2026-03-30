@@ -303,7 +303,7 @@ jobs:
       - test-go-e2e
     outputs:
       image-digest: ${{ steps.build-push.outputs.digest }}
-      image-tag: ${{ steps.build-push.outputs.image-digest }}
+      image-tag: ${{ steps.tag.outputs.image-tag }}
     steps:
       - name: Inject slug vars
         uses: rlespinasse/github-slug-action@9e7def61550737ba68c62d34a32dd31792e3f429 #v5.5.0
@@ -341,8 +341,8 @@ jobs:
       - name: Login to registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 #v3.7.0
         with:
-          registry: ${{ secrets.REGISTRY_HOST }}
-          username: ${{ secrets.REGISTRY_AUTH_USER }}
+          registry: ${{ vars.REGISTRY_HOST }}
+          username: ${{ vars.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_AUTH_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a #v4.0.0
@@ -354,8 +354,8 @@ jobs:
         env:
           DOCKER_BUILD_SUMMARY: false
         with:
-          tags: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:${{ steps.tag.outputs.image-tag }}
-          cache-from: type=registry,ref=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}:latest
+          tags: ${{ vars.REGISTRY_HOST }}${{ vars.REGISTRY_REPO }}:${{ steps.tag.outputs.image-tag }}
+          cache-from: type=registry,ref=${{ vars.REGISTRY_HOST }}${{ vars.REGISTRY_REPO }}:latest
           cache-to: type=inline
           build-args: GO_VERSION=${{ needs.build-go.outputs.go-version }}
           provenance: false
@@ -372,10 +372,10 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 #v0.35.0
         env:
-          TRIVY_USERNAME: ${{ secrets.REGISTRY_AUTH_USER }}
+          TRIVY_USERNAME: ${{ vars.REGISTRY_USER }}
           TRIVY_PASSWORD: ${{ secrets.REGISTRY_AUTH_TOKEN }}
         with:
-          image-ref: '${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}'
+          image-ref: '${{ vars.REGISTRY_HOST }}${{ vars.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}'
           exit-code: '1'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -388,14 +388,34 @@ jobs:
       - scan-image
       - govulncheck
     steps:
-      - name: Install cosign
+      - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad #v4.0.0
-      - name: Sign image
+        with:
+          cosign-release: 'v2.5.3'
+      - name: Sign image using cosign
+        id: cosign-sign
         run: |
-          cosign sign \
-            --key "${{ secrets.COSIGN_KEY }}" \
-            -a "repo=${{ github.repository }}" \
-            -a "commit-sha=${{ github.sha }}" \
-            --tlog-upload=false \
-            -y \
-            "${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}"
+          echo "TAGS=${TAGS}"
+          echo "DIGEST=${DIGEST}"
+          images=""
+          for tag in ${TAGS}; do
+            images+="${REGISTRY}${REGISTRY_REPO}:${tag}@${DIGEST} "
+          done
+          echo "images=${images}" >> $GITHUB_OUTPUT
+          cosign login -u ${REGISTRY_USER} -p ${REGISTRY_PASSWORD} ${REGISTRY}
+          cosign sign --key env://COSIGN_PRIVATE_KEY --tlog-upload=false ${images}
+        env:
+          TAGS: ${{ needs.build-push-image.outputs.image-tag }}
+          DIGEST: ${{ needs.build-push-image.outputs.image-digest }}
+          REGISTRY: ${{ vars.REGISTRY_HOST }}
+          REGISTRY_REPO: ${{ vars.REGISTRY_REPO }}
+          REGISTRY_USER: ${{ vars.REGISTRY_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      - name: Verify signature
+        run: |
+          cosign verify --insecure-ignore-tlog=true --key env://COSIGN_PUBLIC_KEY ${IMAGES}
+        env:
+          IMAGES: ${{ steps.cosign-sign.outputs.images }}
+          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
