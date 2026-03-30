@@ -4,12 +4,16 @@
 
 name: CI
 
-# Required secrets:
+# Required vars:
 # - REGISTRY_HOST: e.g. mtr.devops.telekom.de
 # - REGISTRY_REPO: e.g. /tardis-internal/gateway/rotator
-# - REGISTRY_AUTH_USER: Name of MTR robot user
-# - REGISTRY_AUTH_TOKEN: Name of MTR robot token
-# - COSIGN_KEY: Private key file used for image signing
+# - REGISTRY_USER: Name of MTR robot user
+#
+# Required secrets:
+# - REGISTRY_AUTH_TOKEN: MTR robot token
+# - COSIGN_PASSWORD: Passphrase for the cosign private key
+# - COSIGN_PRIVATE_KEY: Private key used for image signing
+# - COSIGN_PUBLIC_KEY: Public key used for signature verification
 
 on:
   pull_request:
@@ -321,7 +325,7 @@ jobs:
               if [[ "${GITHUB_REF_POINT_SLUG}" == "main" ]]; then
                 export TAG="latest"
               else
-                export TAG=${GITHUB_REF_POINT_SLUG}-${GITHUB_RUN_ID}
+                export TAG=${GITHUB_REF_POINT_SLUG}
               fi
             fi
           fi
