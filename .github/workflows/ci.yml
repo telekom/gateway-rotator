@@ -123,7 +123,7 @@ jobs:
           # Copy custom config into config dir
           cp ${GITHUB_WORKSPACE}/.github/ort/config.yml ${ORT_CONFIG_DIR}
       - name: Run GitHub Action for ORT
-        uses: oss-review-toolkit/ort-ci-github-action@1805edcf1f4f55f35ae6e4d2d9795ccfb29b6021 #v1.1.0
+        uses: oss-review-toolkit/ort-ci-github-action@15444ef12061233721b86e4f36b90717c4e266b5 #commit on master including full sha pins for transitive actions
         with:
           fail-on: violations
           docker-cli-args: >-
