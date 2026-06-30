@@ -5,12 +5,12 @@
 name: CI
 
 # Required vars:
-# - REGISTRY_HOST: e.g. mtr.devops.telekom.de
-# - REGISTRY_REPO: e.g. /tardis-internal/gateway/rotator
-# - REGISTRY_USER: Name of MTR robot user
+# - REGISTRY_HOST: e.g. registry.example.com
+# - REGISTRY_REPO: e.g. /org/project/rotator
 #
 # Required secrets:
-# - REGISTRY_AUTH_TOKEN: MTR robot token
+# - ARTIFACTORY_O28M_PUSH_USER: Container registry username
+# - ARTIFACTORY_O28M_PUSH_TOKEN: Container registry password/token
 # - COSIGN_PASSWORD: Passphrase for the cosign private key
 # - COSIGN_PRIVATE_KEY: Private key used for image signing
 # - COSIGN_PUBLIC_KEY: Public key used for signature verification
@@ -299,7 +299,7 @@ jobs:
   # Image jobs
   # ---------
   build-push-image:
-    name: Build & push image to MTR
+    name: Build & push image
     runs-on: ubuntu-latest
     needs:
       - build-go
@@ -346,8 +346,8 @@ jobs:
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 #v3.7.0
         with:
           registry: ${{ vars.REGISTRY_HOST }}
-          username: ${{ vars.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+          username: ${{ secrets.ARTIFACTORY_O28M_PUSH_USER }}
+          password: ${{ secrets.ARTIFACTORY_O28M_PUSH_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a #v4.0.0
       - name: Set up Docker Buildx
@@ -376,8 +376,8 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 #v0.35.0
         env:
-          TRIVY_USERNAME: ${{ vars.REGISTRY_USER }}
-          TRIVY_PASSWORD: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+          TRIVY_USERNAME: ${{ secrets.ARTIFACTORY_O28M_PUSH_USER }}
+          TRIVY_PASSWORD: ${{ secrets.ARTIFACTORY_O28M_PUSH_TOKEN }}
         with:
           image-ref: '${{ vars.REGISTRY_HOST }}${{ vars.REGISTRY_REPO }}@${{ needs.build-push-image.outputs.image-digest }}'
           exit-code: '1'
@@ -413,8 +413,8 @@ jobs:
           DIGEST: ${{ needs.build-push-image.outputs.image-digest }}
           REGISTRY: ${{ vars.REGISTRY_HOST }}
           REGISTRY_REPO: ${{ vars.REGISTRY_REPO }}
-          REGISTRY_USER: ${{ vars.REGISTRY_USER }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+          REGISTRY_USER: ${{ secrets.ARTIFACTORY_O28M_PUSH_USER }}
+          REGISTRY_PASSWORD: ${{ secrets.ARTIFACTORY_O28M_PUSH_TOKEN }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       - name: Verify signature
