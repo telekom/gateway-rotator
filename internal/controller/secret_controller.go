@@ -23,6 +23,7 @@ import (
 // SecretReconciler reconciles secrets with the proper source annotation.
 type SecretReconciler struct {
 	client.Client
+
 	Scheme               *runtime.Scheme
 	SourceAnnotation     string
 	TargetNameAnnotation string
@@ -81,7 +82,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Calculate kid
 	kid := uuid.NewSHA1(uuid.Nil, source.Data["tls.crt"])
 
-	if !targetExists { //nolint:nestif // would be more complex if it was in separate method
+	if !targetExists {
 		// Target doesn't exist -> initialize it
 		target := initializeLocalTarget(source, kid)
 
@@ -95,29 +96,29 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return ctrl.Result{}, err
 		}
 		log.Info("Successfully created target secret")
-	} else {
-		// Target does exist -> rotate values
-		// Don't rotate if source is equal to next-tls
-		if string(source.Data["tls.crt"]) == string(target.Data["next-tls.crt"]) {
-			log.Info("Skipping update, source certificate is equal to certificate in target/next-tls.crt")
-			return ctrl.Result{}, nil
-		}
-
-		log.Info("Updating target secret with rotated values")
-		updateLocalTargetData(target, source, kid)
-
-		if err = controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
-			log.Error(err, "Failed to set controller reference")
-			return ctrl.Result{}, err
-		}
-
-		// Update the target secret
-		if err = r.Update(ctx, target); err != nil {
-			log.Error(err, "Failed to update target secret")
-			return ctrl.Result{}, err
-		}
-		log.Info("Successfully updated target secret with rotated values")
+		return ctrl.Result{}, nil
 	}
+
+	// Don't rotate if source is equal to next-tls
+	if string(source.Data["tls.crt"]) == string(target.Data["next-tls.crt"]) {
+		log.Info("Skipping update, source certificate is equal to certificate in target/next-tls.crt")
+		return ctrl.Result{}, nil
+	}
+
+	log.Info("Updating target secret with rotated values")
+	updateLocalTargetData(target, source, kid)
+
+	if err = controllerutil.SetControllerReference(source, target, r.Scheme); err != nil {
+		log.Error(err, "Failed to set controller reference")
+		return ctrl.Result{}, err
+	}
+
+	// Update the target secret
+	if err = r.Update(ctx, target); err != nil {
+		log.Error(err, "Failed to update target secret")
+		return ctrl.Result{}, err
+	}
+	log.Info("Successfully updated target secret with rotated values")
 	return ctrl.Result{}, nil
 }
 

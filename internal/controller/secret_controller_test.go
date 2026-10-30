@@ -126,12 +126,15 @@ var _ = Describe("Secret Controller", Serial, func() {
 					).To(Succeed(), "update of source secret failed")
 				})
 				It("does not update the target secret", func() {
+					resourceVersion := target.ResourceVersion
 					time.Sleep(time.Second * 2) // give controller a chance to reconcile
 					Consistently(func(g Gomega) {
 						g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "target", Namespace: namespace}, target)).
 							To(Succeed())
 						_, ok := target.Annotations["some-new-annotation"]
 						g.Expect(ok).To(BeFalse(), "target secret should not have been touched")
+						g.Expect(target.ResourceVersion).
+							To(Equal(resourceVersion), "target secret should not have been updated")
 					}, timeout, interval).Should(Succeed(), "the target secret should not have been updated")
 				})
 			})
@@ -430,6 +433,7 @@ var _ = Describe("Secret Controller", Serial, func() {
 // Simple extension of the client.Client interface that is able to inject errors.
 type errorInjectingClient struct {
 	client.Client
+
 	errorToThrow error
 }
 

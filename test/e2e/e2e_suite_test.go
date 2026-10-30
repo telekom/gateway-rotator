@@ -29,7 +29,7 @@ var (
 // temporary environment to validate project changes with the the purposed to be used in CI jobs.
 // Tests will likely fail if they aren't run in a completely clean kind cluster.
 // This setup requires Kind and builds/loads the Manager Docker image locally.
-func TestE2E(t *testing.T) {
+func TestE2E(t *testing.T) { //nolint:paralleltest // Ginkgo manages suite parallelism.
 	RegisterFailHandler(Fail)
 	_, _ = fmt.Fprintf(GinkgoWriter, "Starting k8s-tls-rotator integration test suite\n")
 	RunSpecs(t, "e2e suite")
