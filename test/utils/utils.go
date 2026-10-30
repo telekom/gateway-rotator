@@ -102,8 +102,7 @@ func LoadImageToKindClusterWithName(ctx context.Context, imageName string, clust
 // according to line breakers, and ignores the empty elements in it.
 func GetNonEmptyLines(output string) []string {
 	var res []string
-	elements := strings.Split(output, "\n")
-	for _, element := range elements {
+	for element := range strings.SplitSeq(output, "\n") {
 		if element != "" {
 			res = append(res, element)
 		}

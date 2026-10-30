@@ -38,7 +38,7 @@ var (
 )
 
 // TestControllers is the entry point for all tests in controller_test.
-func TestControllers(t *testing.T) {
+func TestControllers(t *testing.T) { //nolint:paralleltest // Ginkgo manages suite parallelism.
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
