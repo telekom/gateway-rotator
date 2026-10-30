@@ -1,0 +1,14 @@
+.golangci.yml
+  h_052be7cb63ce69 229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "8f945339e17f6f91b0d3f62b7994d35256adb30d",
+  "prompts": {},
+  "humans": {
+    "h_052be7cb63ce69": {
+      "author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  }
+}
