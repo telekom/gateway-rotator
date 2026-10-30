@@ -1,0 +1,18 @@
+Dockerfile
+  h_052be7cb63ce69 6
+go.mod
+  h_052be7cb63ce69 7,88,94
+go.sum
+  h_052be7cb63ce69 209-210,223-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "976ef03e93a33ab92b2283bf96357601ea0b5d7c",
+  "prompts": {},
+  "humans": {
+    "h_052be7cb63ce69": {
+      "author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  }
+}
