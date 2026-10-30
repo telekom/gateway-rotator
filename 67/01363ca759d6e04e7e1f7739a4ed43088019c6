@@ -1,0 +1,27 @@
+.golangci.yml
+  s_22378a628632f1::t_4de686dba2219d 5,10,12,30-31,54,60,78,87,92,103,122,130,132,139
+  s_22378a628632f1::t_9f7c0dfc37656f 153,155,165,226-230,244-250,252,276-281,322-332,394-396,412-415,417-420
+  h_052be7cb63ce69 242
+  h_052be7cb63ce69 243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "6701363ca759d6e04e7e1f7739a4ed43088019c6",
+  "prompts": {},
+  "humans": {
+    "h_052be7cb63ce69": {
+      "author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  },
+  "sessions": {
+    "s_22378a628632f1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72997774ffeZ80uAnP4rvBs4b",
+        "model": "github-copilot/gpt-6.1-sol"
+      },
+      "human_author": null
+    }
+  }
+}
