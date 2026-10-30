@@ -1,0 +1,20 @@
+Dockerfile
+  h_052be7cb63ce69 6
+go.mod
+  h_052be7cb63ce69 7,10,70-76,82-83,85-88,90,92-93,94
+go.sum
+  h_052be7cb63ce69 39-40,169-184,197-200,203-210,213-214,219-222,223-224
+.golangci.yml
+  h_052be7cb63ce69 229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "290a610ccb9769f2a0c68e74762e4f5e5e2eeb54",
+  "prompts": {},
+  "humans": {
+    "h_052be7cb63ce69": {
+      "author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  }
+}
