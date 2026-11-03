@@ -1,0 +1,20 @@
+Dockerfile
+  s_22378a628632f1::t_bf475b4b7ab3ee 24-25
+  s_22378a628632f1::t_a60cbcb6c89e79 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "94cced7c53c5864019d3e638dc7f3292c2f4d4d5",
+  "prompts": {},
+  "sessions": {
+    "s_22378a628632f1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72997774ffeZ80uAnP4rvBs4b",
+        "model": "github-copilot/claude-opus-5.5-long"
+      },
+      "human_author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  }
+}
