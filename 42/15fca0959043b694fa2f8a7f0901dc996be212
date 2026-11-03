@@ -1,0 +1,41 @@
+internal/controller/suite_test.go
+  s_22378a628632f1::t_0255a377f1b926 41
+test/e2e/e2e_suite_test.go
+  s_22378a628632f1::t_0255a377f1b926 32
+.golangci.yml
+  h_052be7cb63ce69 242-243
+  s_22378a628632f1::t_4de686dba2219d 5,10,12,30-31,54,60,78,87,92,103,122,130,132,139
+  s_22378a628632f1::t_9f7c0dfc37656f 153,155,165,226-230,244-250,252,276-281,322-332,394-396,412-415,417-420
+internal/controller/secret_controller_test.go
+  s_22378a628632f1::t_8b122a2870e4ba 136-137
+  s_22378a628632f1::t_0255a377f1b926 129,436
+test/utils/utils.go
+  s_22378a628632f1::t_0255a377f1b926 105
+internal/controller/secret_controller.go
+  s_22378a628632f1::t_0255a377f1b926 26,85,99-100,102-106,108-109,111-119,121
+go.mod
+  s_22378a628632f1::t_667ccf2ab86e00 94
+go.sum
+  s_22378a628632f1::t_0fee9de427c7c2 223-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "4215fca0959043b694fa2f8a7f0901dc996be212",
+  "prompts": {},
+  "humans": {
+    "h_052be7cb63ce69": {
+      "author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  },
+  "sessions": {
+    "s_22378a628632f1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72997774ffeZ80uAnP4rvBs4b",
+        "model": "github-copilot/claude-opus-5.5-long"
+      },
+      "human_author": null
+    }
+  }
+}
