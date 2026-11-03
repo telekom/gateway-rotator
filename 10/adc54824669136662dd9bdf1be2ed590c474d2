@@ -1,0 +1,21 @@
+go.mod
+  s_22378a628632f1::t_667ccf2ab86e00 94
+go.sum
+  s_22378a628632f1::t_0fee9de427c7c2 223-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.6",
+  "base_commit_sha": "10adc54824669136662dd9bdf1be2ed590c474d2",
+  "prompts": {},
+  "sessions": {
+    "s_22378a628632f1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72997774ffeZ80uAnP4rvBs4b",
+        "model": "github-copilot/claude-opus-5.5-long"
+      },
+      "human_author": "Niklas Beilmann <niklas.beilmann@telekom.de>"
+    }
+  }
+}
