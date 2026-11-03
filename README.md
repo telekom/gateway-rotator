@@ -56,15 +56,15 @@ data:
   prev-tls.crt: xxx
   prev-tls.key: xxx
   prev-tls.kid: xxx
-  tls.crt: ""
-  tls.key: ""
-  tls.kid: ""
-  next-tls.crt: ""
-  next-tls.key: ""
-  next-tls.kid: ""
+  tls.crt: xxx
+  tls.key: xxx
+  tls.kid: xxx
+  next-tls.crt: xxx
+  next-tls.key: xxx
+  next-tls.kid: xxx
 ```
 
-**Initial creation:** The source certificate and key are placed in `next-tls.*` fields. The `next-tls.kid` contains a UUID generated from the certificate hash, which can be used as a Key ID in JWK sets. The `tls.*` and `prev-tls.*` fields are initially empty.
+**Initial creation:** The source certificate and key are placed in all three slots (`next-tls.*`, `tls.*` and `prev-tls.*`), so the target is immediately usable for signing on a fresh cluster. The `*.kid` fields contain a UUID generated from the certificate hash, which can be used as a Key ID in JWK sets. Authorization servers should deduplicate keys by `kid` (the issuer-service does).
 
 **Subsequent rotations:** When the source secret is updated (e.g., by cert-manager renewal), the operator performs a three-way rotation:
 

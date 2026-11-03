@@ -84,13 +84,14 @@ var _ = Describe("Secret Controller", Serial, func() {
 				Expect(target.Data["next-tls.key"]).To(Equal([]byte("key")))
 			})
 
-			By("leaving tls.* and prev-tls.* empty", func() {
-				Expect(target.Data["tls.crt"]).To(BeEmpty())
-				Expect(target.Data["tls.key"]).To(BeEmpty())
-				Expect(target.Data["tls.kid"]).To(BeEmpty())
-				Expect(target.Data["prev-tls.crt"]).To(BeEmpty())
-				Expect(target.Data["prev-tls.key"]).To(BeEmpty())
-				Expect(target.Data["prev-tls.kid"]).To(BeEmpty())
+			By("filling tls.* and prev-tls.* with the source values as well", func() {
+				kid := generateUuid(string(source.Data["tls.crt"]))
+				Expect(target.Data["tls.crt"]).To(Equal([]byte("cert")))
+				Expect(target.Data["tls.key"]).To(Equal([]byte("key")))
+				Expect(target.Data["tls.kid"]).To(Equal(kid))
+				Expect(target.Data["prev-tls.crt"]).To(Equal([]byte("cert")))
+				Expect(target.Data["prev-tls.key"]).To(Equal([]byte("key")))
+				Expect(target.Data["prev-tls.kid"]).To(Equal(kid))
 			})
 
 			By("generating a UUID based on the cert and setting it as a kid", func() {
@@ -168,9 +169,9 @@ var _ = Describe("Secret Controller", Serial, func() {
 							g.Expect(target.Data["tls.crt"]).To(Equal([]byte("cert")))
 							g.Expect(target.Data["tls.key"]).To(Equal([]byte("key")))
 							g.Expect(target.Data["tls.kid"]).To(Equal(generateUuid("cert")))
-							g.Expect(target.Data["prev-tls.crt"]).To(BeEmpty())
-							g.Expect(target.Data["prev-tls.key"]).To(BeEmpty())
-							g.Expect(target.Data["prev-tls.kid"]).To(BeEmpty())
+							g.Expect(target.Data["prev-tls.crt"]).To(Equal([]byte("cert")))
+							g.Expect(target.Data["prev-tls.key"]).To(Equal([]byte("key")))
+							g.Expect(target.Data["prev-tls.kid"]).To(Equal(generateUuid("cert")))
 						}, timeout, interval).Should(Succeed(), "controller did not produce the expected target secret within timeout")
 					})
 
